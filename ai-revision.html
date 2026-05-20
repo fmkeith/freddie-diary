@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Revision — Freddie Mason</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --green: #00ff88;
+      --green-dim: #00aa55;
+      --bg: #0a0f0a;
+      --surface: #0f1a0f;
+      --border: #1a3d1a;
+      --text: #c8c8c8;
+      --dim: #555;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.05;
+      pointer-events: none;
+    }
+
+    .progress-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 2px;
+      background: var(--green);
+      z-index: 300;
+      transition: width 0.05s;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10,15,10,0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 { font-family: monospace; font-size: 1rem; color: var(--green); letter-spacing: 2px; }
+    header span { font-family: monospace; font-size: 0.72rem; color: var(--dim); }
+
+    /* ── NAV ── */
+    .nav {
+      position: sticky;
+      top: 53px;
+      z-index: 99;
+      background: rgba(10,15,10,0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 11px 48px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: monospace;
+      font-size: 0.7rem;
+      padding: 5px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      letter-spacing: 1px;
+    }
+    .pill:hover, .pill.active { border-color: var(--green); color: var(--green); }
+
+    /* ── SECTIONS ── */
+    section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 64px 48px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+    }
+
+    .label { font-family: monospace; font-size: 0.68rem; letter-spacing: 3px; color: var(--green); text-transform: uppercase; margin-bottom: 8px; }
+    section h2 { font-size: 1.9rem; color: #fff; margin-bottom: 14px; line-height: 1.2; }
+    section > p { color: var(--text); line-height: 1.75; margin-bottom: 12px; max-width: 640px; }
+
+    /* ── SCORE BAR ── */
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 20px;
+      margin-bottom: 28px;
+      font-family: monospace;
+      font-size: 0.82rem;
+    }
+
+    .score-val { color: var(--green); font-size: 1.2rem; min-width: 40px; }
+    .score-label { color: var(--dim); }
+    .score-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
+    .score-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width 0.4s; }
+
+    /* ── FLASH CARDS ── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .flash-card {
+      height: 180px;
+      perspective: 800px;
+      cursor: pointer;
+    }
+
+    .flash-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.77, 0, 0.175, 1);
+    }
+
+    .flash-card.flipped .flash-inner { transform: rotateY(180deg); }
+
+    .flash-front, .flash-back {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      border-radius: 6px;
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .flash-front {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .flash-back {
+      background: #0a1f0a;
+      border: 1px solid var(--green);
+      transform: rotateY(180deg);
+    }
+
+    .flash-q {
+      font-size: 0.95rem;
+      color: #fff;
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .flash-hint {
+      font-family: monospace;
+      font-size: 0.65rem;
+      color: var(--dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: auto;
+    }
+
+    .flash-topic {
+      font-family: monospace;
+      font-size: 0.65rem;
+      color: var(--green);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .flash-a {
+      font-size: 0.88rem;
+      color: #c8c8c8;
+      line-height: 1.65;
+    }
+
+    .flash-card.seen .flash-front { border-color: var(--green-dim); }
+
+    /* ── CONTROLS ── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: monospace;
+      font-size: 0.75rem;
+      padding: 7px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--green); color: var(--green); }
+    .btn.primary { border-color: var(--green); color: var(--green); }
+    .btn.primary:hover { background: var(--green); color: #000; }
+
+    /* ── TEXT EVALUATION ── */
+    .eval-text {
+      background: #000;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--green);
+      border-radius: 0 6px 6px 0;
+      padding: 24px 28px;
+      margin: 20px 0;
+      font-size: 0.92rem;
+      line-height: 1.8;
+      color: #bbb;
+    }
+
+    .eval-source {
+      font-family: monospace;
+      font-size: 0.68rem;
+      color: var(--dim);
+      margin-top: 14px;
+      letter-spacing: 1px;
+    }
+
+    .eval-questions { margin: 24px 0; }
+
+    .eval-q {
+      margin-bottom: 20px;
+    }
+
+    .eval-q-label {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--green);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .eval-q-text {
+      font-size: 0.92rem;
+      color: #fff;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .eval-hint {
+      font-size: 0.8rem;
+      color: var(--dim);
+      margin-bottom: 8px;
+      font-style: italic;
+    }
+
+    .eval-ta {
+      width: 100%;
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: #fff;
+      font-family: Georgia, serif;
+      font-size: 0.88rem;
+      padding: 12px 14px;
+      resize: vertical;
+      outline: none;
+      line-height: 1.7;
+      min-height: 80px;
+      transition: border-color 0.15s;
+    }
+    .eval-ta:focus { border-color: var(--green); }
+    .eval-ta::placeholder { color: #333; font-style: italic; }
+
+    /* ── TEXT TABS ── */
+    .text-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .text-tab {
+      padding: 9px 20px;
+      font-family: monospace;
+      font-size: 0.72rem;
+      color: var(--dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      letter-spacing: 1px;
+    }
+    .text-tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+    .text-panel { display: none; }
+    .text-panel.active { display: block; }
+
+    /* ── KEY TERMS ── */
+    .terms-list { margin-top: 16px; }
+
+    .term {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+    }
+    .term:last-child { border-bottom: none; }
+
+    .term-word {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: var(--green);
+      min-width: 200px;
+      padding-right: 20px;
+      line-height: 1.5;
+    }
+
+    .term-def {
+      font-size: 0.88rem;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    /* ── SAVE INDICATOR ── */
+    .saved-msg {
+      font-family: monospace;
+      font-size: 0.68rem;
+      color: var(--dim);
+      letter-spacing: 1px;
+      margin-top: 6px;
+      height: 14px;
+      transition: color 0.3s;
+    }
+    .saved-msg.ok { color: var(--green); }
+
+    /* ── CHECKLIST ── */
+    .checklist { list-style: none; margin: 20px 0; }
+    .checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .checklist li:last-child { border-bottom: none; }
+
+    .check-box {
+      width: 18px; height: 18px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem;
+      color: var(--green);
+      transition: all 0.15s;
+      margin-top: 2px;
+    }
+    .checklist li.done .check-box { background: var(--green); border-color: var(--green); color: #000; }
+    .checklist li.done span { color: var(--dim); text-decoration: line-through; }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="progress-bar" id="prog"></div>
+
+<header>
+  <h1>// possibilities-of-ai · revision</h1>
+  <span>Freddie Mason · Year 10 · Work Experience 2026</span>
+</header>
+
+<nav class="nav">
+  <div class="pill active" data-target="flashcards">Flash Cards</div>
+  <div class="pill" data-target="keyterms">Key Terms</div>
+  <div class="pill" data-target="evaluate">Evaluate Texts</div>
+  <div class="pill" data-target="checklist">Checklist</div>
+</nav>
+
+<main>
+
+  <!-- ── FLASH CARDS ── -->
+  <section id="flashcards">
+    <div class="label">01 · Flash Cards</div>
+    <h2>Tap to flip.<br>Test yourself.</h2>
+    <p>Click any card to reveal the answer. Try to answer in your head first. Cards you've seen get a green border — work through all of them.</p>
+
+    <div class="score-bar">
+      <div class="score-val" id="seen-count">0</div>
+      <div class="score-label">of 12 cards seen</div>
+      <div class="score-track"><div class="score-fill" id="seen-fill" style="width:0%"></div></div>
+      <button class="btn" onclick="resetCards()">↺ Reset</button>
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" onclick="flipAll(true)">Reveal all</button>
+      <button class="btn" onclick="flipAll(false)">Hide all</button>
+    </div>
+
+    <div class="cards-grid" id="cards-grid">
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is Artificial Intelligence (AI)?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Definition</div>
+            <div class="flash-a">The ability of a computer or machine to perform tasks that would normally require human intelligence — such as understanding language, recognising images, or making decisions.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is Machine Learning?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Machine Learning</div>
+            <div class="flash-a">A type of AI where a system learns from data rather than being explicitly programmed. The more data it sees, the better it gets — like how Spotify learns your taste in music.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is Natural Language Processing (NLP)?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">NLP</div>
+            <div class="flash-a">AI that understands and generates human language. It powers chatbots, voice assistants (Siri, Alexa), translation tools, and spelling checkers.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is Computer Vision?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Computer Vision</div>
+            <div class="flash-a">AI that can interpret and understand images and video. Used in facial recognition, self-driving cars, medical scans, and photo tagging on social media.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">Give three benefits of AI in everyday life.</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Benefits</div>
+            <div class="flash-a">1. Faster and more accurate medical diagnosis.<br>2. Personalised recommendations (Netflix, Spotify).<br>3. Automation of dangerous or repetitive jobs, keeping humans safer.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">Give three risks or concerns about AI.</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Risks</div>
+            <div class="flash-a">1. Job displacement — AI automating roles previously done by people.<br>2. Bias in AI systems reflecting unfair training data.<br>3. Privacy concerns from facial recognition and data collection.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is AI bias? Give an example.</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">AI Bias</div>
+            <div class="flash-a">When an AI makes unfair decisions because its training data was unrepresentative. Example: facial recognition systems that are less accurate for darker skin tones because training data was mostly lighter-skinned faces.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is the Turing Test?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Turing Test</div>
+            <div class="flash-a">Proposed by Alan Turing in 1950. A human has a text conversation with both a machine and another human — if they can't tell which is which, the machine has "passed." It measures whether AI can convincingly simulate human intelligence.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">How is AI used in healthcare?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Healthcare</div>
+            <div class="flash-a">Analysing medical scans to detect cancer earlier than doctors can. Drug discovery — simulating how molecules interact. Predicting patient deterioration. AI can process far more data far faster than a human clinician.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is a neural network?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Neural Networks</div>
+            <div class="flash-a">A computer system loosely modelled on the human brain — made up of layers of interconnected nodes. It learns by adjusting the strength of connections based on whether its outputs were right or wrong.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What is automation and how does AI enable it?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Automation</div>
+            <div class="flash-a">Replacing human labour with machines or software. AI goes further than traditional automation — it can handle unpredictable situations, make judgements, and improve over time without being reprogrammed.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front">
+            <div class="flash-q">What ethical questions does AI raise?</div>
+            <div class="flash-hint">tap to reveal ▸</div>
+          </div>
+          <div class="flash-back">
+            <div class="flash-topic">Ethics</div>
+            <div class="flash-a">Who is responsible when AI makes a harmful decision? Should AI be used in criminal justice? How do we prevent surveillance states using facial recognition? Should AI be allowed to create art or write essays?</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── KEY TERMS ── -->
+  <section id="keyterms">
+    <div class="label">02 · Key Terms</div>
+    <h2>Vocabulary to know<br>for the exam.</h2>
+    <p>These are the terms most likely to come up. Learn the definition, then try to use each word in a sentence of your own.</p>
+
+    <div class="terms-list">
+      <div class="term"><div class="term-word">Artificial Intelligence</div><div class="term-def">Computer systems that can perform tasks requiring human-like intelligence.</div></div>
+      <div class="term"><div class="term-word">Algorithm</div><div class="term-def">A set of step-by-step instructions that a computer follows to solve a problem or complete a task.</div></div>
+      <div class="term"><div class="term-word">Machine Learning</div><div class="term-def">A subset of AI where systems learn and improve from experience without being explicitly programmed.</div></div>
+      <div class="term"><div class="term-word">Training data</div><div class="term-def">The dataset used to teach an AI model. The quality and diversity of this data determines how well the AI performs.</div></div>
+      <div class="term"><div class="term-word">Neural network</div><div class="term-def">A computing system modelled loosely on the human brain, consisting of interconnected layers of nodes.</div></div>
+      <div class="term"><div class="term-word">Natural Language Processing</div><div class="term-def">AI that enables computers to understand, interpret, and generate human language.</div></div>
+      <div class="term"><div class="term-word">Computer Vision</div><div class="term-def">AI that allows computers to interpret and understand visual information from the world.</div></div>
+      <div class="term"><div class="term-word">Automation</div><div class="term-def">Using technology to perform tasks with minimal human input.</div></div>
+      <div class="term"><div class="term-word">AI Bias</div><div class="term-def">Systematic and unfair outcomes in AI systems, usually caused by unrepresentative training data.</div></div>
+      <div class="term"><div class="term-word">Turing Test</div><div class="term-def">A test of a machine's ability to exhibit intelligent behaviour indistinguishable from a human.</div></div>
+      <div class="term"><div class="term-word">Ethical AI</div><div class="term-def">The practice of designing AI systems that are fair, transparent, accountable, and safe.</div></div>
+      <div class="term"><div class="term-word">Deep Learning</div><div class="term-def">A type of machine learning using many-layered neural networks to model complex patterns in data.</div></div>
+    </div>
+  </section>
+
+  <!-- ── EVALUATE TEXTS ── -->
+  <section id="evaluate">
+    <div class="label">03 · Evaluate Texts</div>
+    <h2>Read, analyse,<br>evaluate.</h2>
+    <p>Evaluating a text means more than summarising it. You need to identify the argument, examine the evidence, spot bias, and judge how reliable it is. Work through each text below.</p>
+
+    <div class="text-tabs">
+      <div class="text-tab active" data-panel="text1">Text 1 — Optimistic</div>
+      <div class="text-tab" data-panel="text2">Text 2 — Critical</div>
+      <div class="text-tab" data-panel="text3">Text 3 — Balanced</div>
+    </div>
+
+    <!-- TEXT 1 -->
+    <div class="text-panel active" id="text1">
+      <div class="eval-text">
+        <p>"Artificial intelligence represents the most transformative technology of the 21st century. Already, AI-powered diagnostic tools are detecting cancers that human doctors miss. Self-driving vehicles promise to eliminate the 95% of accidents caused by human error. In education, personalised AI tutors can adapt to each student's individual pace and learning style, making high-quality education available to anyone with a smartphone.</p>
+        <p>The economic benefits are equally compelling. McKinsey estimates AI could add $13 trillion to global GDP by 2030. Far from destroying jobs, history shows that technological revolutions — from the printing press to the internet — ultimately create more employment than they displace. We should embrace AI as a tool that amplifies human capability rather than fearing it as a threat."</p>
+        <div class="eval-source">— Adapted from a technology industry white paper, 2024</div>
+      </div>
+
+      <div class="eval-questions">
+        <div class="eval-q">
+          <div class="eval-q-label">Q1 · Argument</div>
+          <div class="eval-q-text">What is the author's main argument? Summarise it in one or two sentences.</div>
+          <div class="eval-hint">Think: what is the overall point they are trying to convince you of?</div>
+          <textarea class="eval-ta" id="t1q1" placeholder="Write your answer here..." oninput="saveEval('t1q1')"></textarea>
+          <div class="saved-msg" id="msg-t1q1"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q2 · Evidence</div>
+          <div class="eval-q-text">What evidence does the author use? How convincing is it?</div>
+          <div class="eval-hint">Look for: statistics, examples, expert opinion, comparisons. Are these backed up? Could they be cherry-picked?</div>
+          <textarea class="eval-ta" id="t1q2" placeholder="Write your answer here..." oninput="saveEval('t1q2')"></textarea>
+          <div class="saved-msg" id="msg-t1q2"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q3 · Bias & Reliability</div>
+          <div class="eval-q-text">The source is a technology industry white paper. How does this affect how much you trust it?</div>
+          <div class="eval-hint">Who wrote it? What do they gain from convincing you? What might they have left out?</div>
+          <textarea class="eval-ta" id="t1q3" placeholder="Write your answer here..." oninput="saveEval('t1q3')"></textarea>
+          <div class="saved-msg" id="msg-t1q3"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q4 · Counter-argument</div>
+          <div class="eval-q-text">What is the strongest argument the author hasn't considered?</div>
+          <div class="eval-hint">What could someone who disagrees say back? What real-world examples challenge the author's view?</div>
+          <textarea class="eval-ta" id="t1q4" placeholder="Write your answer here..." oninput="saveEval('t1q4')"></textarea>
+          <div class="saved-msg" id="msg-t1q4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEXT 2 -->
+    <div class="text-panel" id="text2">
+      <div class="eval-text">
+        <p>"The promises of artificial intelligence conceal a darker reality. Amazon's AI recruitment tool, trained on a decade of hiring data, had to be scrapped because it systematically downgraded CVs from women. Facial recognition systems deployed by police forces misidentify Black individuals at rates up to 34 percentage points higher than white individuals — yet they are being used to make arrest decisions.</p>
+        <p>Meanwhile, the gig economy — already precarious — faces obliteration. Oxford economists estimate that 47% of US jobs are at high risk of automation within the next two decades. The technology sector's assurances that 'new jobs will emerge' offer cold comfort to a 50-year-old lorry driver. We are sleepwalking into a future where the benefits of AI accrue to a tiny wealthy elite while the costs are borne by everyone else."</p>
+        <div class="eval-source">— Adapted from a newspaper opinion column, 2024</div>
+      </div>
+
+      <div class="eval-questions">
+        <div class="eval-q">
+          <div class="eval-q-label">Q1 · Argument</div>
+          <div class="eval-q-text">What is the author's main argument? How does it differ from Text 1?</div>
+          <div class="eval-hint">Compare the overall stance — not just the topic, but the conclusion the author wants you to reach.</div>
+          <textarea class="eval-ta" id="t2q1" placeholder="Write your answer here..." oninput="saveEval('t2q1')"></textarea>
+          <div class="saved-msg" id="msg-t2q1"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q2 · Language</div>
+          <div class="eval-q-text">Find two examples of emotive or persuasive language. What effect do they have on the reader?</div>
+          <div class="eval-hint">Words like "obliteration", "sleepwalking", "cold comfort" — why choose those words instead of neutral ones?</div>
+          <textarea class="eval-ta" id="t2q2" placeholder="Write your answer here..." oninput="saveEval('t2q2')"></textarea>
+          <div class="saved-msg" id="msg-t2q2"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q3 · Evidence</div>
+          <div class="eval-q-text">The author uses specific examples (Amazon, police facial recognition). Does this make the argument stronger? Any limitations?</div>
+          <div class="eval-hint">Specific examples are powerful, but do two examples prove a general rule? Is this selecting only negative cases?</div>
+          <textarea class="eval-ta" id="t2q3" placeholder="Write your answer here..." oninput="saveEval('t2q3')"></textarea>
+          <div class="saved-msg" id="msg-t2q3"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q4 · Your View</div>
+          <div class="eval-q-text">Which text — 1 or 2 — do you find more convincing and why?</div>
+          <div class="eval-hint">You don't have to agree with either fully. You can say "Text 2 is more convincing on X but Text 1 makes a fair point about Y."</div>
+          <textarea class="eval-ta" id="t2q4" placeholder="Write your answer here..." oninput="saveEval('t2q4')"></textarea>
+          <div class="saved-msg" id="msg-t2q4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEXT 3 -->
+    <div class="text-panel" id="text3">
+      <div class="eval-text">
+        <p>"Artificial intelligence is not inherently good or bad — it is a tool, and like all tools its value depends entirely on how it is used and who controls it. An AI system that helps a radiologist catch a tumour two years earlier is saving a life. The same underlying technology, used to build a mass surveillance system, is a threat to civil liberties.</p>
+        <p>The debate should not be 'is AI good or bad?' but rather 'who benefits, who decides, and who is accountable when it goes wrong?' These are not technical questions — they are political and ethical ones. Young people today will inherit both the opportunities and the problems AI creates. Understanding it is not optional."</p>
+        <div class="eval-source">— Adapted from an academic journal article on technology ethics, 2025</div>
+      </div>
+
+      <div class="eval-questions">
+        <div class="eval-q">
+          <div class="eval-q-label">Q1 · Argument</div>
+          <div class="eval-q-text">This text takes a different approach to texts 1 and 2. What is its central claim?</div>
+          <div class="eval-hint">Look at the question it says we should be asking instead. That's the key.</div>
+          <textarea class="eval-ta" id="t3q1" placeholder="Write your answer here..." oninput="saveEval('t3q1')"></textarea>
+          <div class="saved-msg" id="msg-t3q1"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q2 · Structure</div>
+          <div class="eval-q-text">How does the author use contrast (e.g. the radiologist vs surveillance example)?</div>
+          <div class="eval-hint">Why show both a positive and negative use of the same technology? What does this technique achieve?</div>
+          <textarea class="eval-ta" id="t3q2" placeholder="Write your answer here..." oninput="saveEval('t3q2')"></textarea>
+          <div class="saved-msg" id="msg-t3q2"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q3 · Audience</div>
+          <div class="eval-q-text">The final sentence addresses young people directly. Why might the author have done this?</div>
+          <div class="eval-hint">Think about who the intended reader is and how this line is meant to make them feel.</div>
+          <textarea class="eval-ta" id="t3q3" placeholder="Write your answer here..." oninput="saveEval('t3q3')"></textarea>
+          <div class="saved-msg" id="msg-t3q3"></div>
+        </div>
+
+        <div class="eval-q">
+          <div class="eval-q-label">Q4 · Synthesis</div>
+          <div class="eval-q-text">Using all three texts, write a short paragraph (4–6 sentences) summing up the debate around AI. Use evidence from at least two texts.</div>
+          <div class="eval-hint">Try: "Texts 1 and 3 agree that... however Text 2 argues... On balance..."</div>
+          <textarea class="eval-ta" id="t3q4" style="min-height:120px" placeholder="Write your paragraph here..." oninput="saveEval('t3q4')"></textarea>
+          <div class="saved-msg" id="msg-t3q4"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CHECKLIST ── -->
+  <section id="checklist">
+    <div class="label">04 · Checklist</div>
+    <h2>Track what<br>you've covered.</h2>
+    <p>Tick each one off as you feel confident with it. Saved automatically.</p>
+
+    <ul class="checklist" id="checklist">
+      <li onclick="toggleCheck(this, 'c1')" data-key="c1"><div class="check-box">✓</div><span>I can define Artificial Intelligence in my own words</span></li>
+      <li onclick="toggleCheck(this, 'c2')" data-key="c2"><div class="check-box">✓</div><span>I can explain what Machine Learning is and give an example</span></li>
+      <li onclick="toggleCheck(this, 'c3')" data-key="c3"><div class="check-box">✓</div><span>I can describe what NLP is and name an application</span></li>
+      <li onclick="toggleCheck(this, 'c4')" data-key="c4"><div class="check-box">✓</div><span>I can give three benefits of AI with real-world examples</span></li>
+      <li onclick="toggleCheck(this, 'c5')" data-key="c5"><div class="check-box">✓</div><span>I can give three risks of AI with real-world examples</span></li>
+      <li onclick="toggleCheck(this, 'c6')" data-key="c6"><div class="check-box">✓</div><span>I can explain what AI bias is and why it happens</span></li>
+      <li onclick="toggleCheck(this, 'c7')" data-key="c7"><div class="check-box">✓</div><span>I can describe the Turing Test and its significance</span></li>
+      <li onclick="toggleCheck(this, 'c8')" data-key="c8"><div class="check-box">✓</div><span>I can explain what a neural network is</span></li>
+      <li onclick="toggleCheck(this, 'c9')" data-key="c9"><div class="check-box">✓</div><span>I have completed all flash cards at least once</span></li>
+      <li onclick="toggleCheck(this, 'c10')" data-key="c10"><div class="check-box">✓</div><span>I have evaluated all three texts and written responses</span></li>
+      <li onclick="toggleCheck(this, 'c11')" data-key="c11"><div class="check-box">✓</div><span>I can discuss both sides of the AI debate fairly</span></li>
+      <li onclick="toggleCheck(this, 'c12')" data-key="c12"><div class="check-box">✓</div><span>I can write a balanced paragraph about AI using evidence</span></li>
+    </ul>
+  </section>
+
+</main>
+
+<script>
+  // Binary rain
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const cols = Math.floor(canvas.width / 14);
+  const drops = Array(cols).fill(1);
+  setInterval(() => {
+    ctx.fillStyle = 'rgba(10,15,10,0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '14px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      ctx.fillText(Math.random() > 0.5 ? '1' : '0', i * 14, drops[i] * 14);
+      if (drops[i] * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }, 40);
+  window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+  // Scroll
+  window.addEventListener('scroll', () => {
+    const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+    document.getElementById('prog').style.width = pct + '%';
+    updatePills();
+  });
+
+  // Nav
+  document.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.getElementById(p.dataset.target)?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  function updatePills() {
+    const sections = document.querySelectorAll('section');
+    let current = '';
+    sections.forEach(s => { if (window.scrollY >= s.offsetTop - 130) current = s.id; });
+    document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.target === current));
+  }
+
+  // Text tabs
+  document.querySelectorAll('.text-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.text-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.text-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+  });
+
+  // Flash cards
+  let seenCards = new Set(JSON.parse(localStorage.getItem('ai-seen') || '[]'));
+
+  function flipCard(card) {
+    card.classList.toggle('flipped');
+    if (card.classList.contains('flipped')) {
+      card.classList.add('seen');
+      const idx = [...document.querySelectorAll('.flash-card')].indexOf(card);
+      seenCards.add(idx);
+      localStorage.setItem('ai-seen', JSON.stringify([...seenCards]));
+      updateScore();
+    }
+  }
+
+  function updateScore() {
+    const n = seenCards.size;
+    document.getElementById('seen-count').textContent = n;
+    document.getElementById('seen-fill').style.width = (n / 12 * 100) + '%';
+  }
+
+  function flipAll(open) {
+    document.querySelectorAll('.flash-card').forEach((c, i) => {
+      if (open) { c.classList.add('flipped', 'seen'); seenCards.add(i); }
+      else c.classList.remove('flipped');
+    });
+    if (open) { localStorage.setItem('ai-seen', JSON.stringify([...seenCards])); updateScore(); }
+  }
+
+  function resetCards() {
+    document.querySelectorAll('.flash-card').forEach(c => c.classList.remove('flipped', 'seen'));
+    seenCards.clear();
+    localStorage.removeItem('ai-seen');
+    updateScore();
+  }
+
+  // Restore seen state
+  document.querySelectorAll('.flash-card').forEach((c, i) => {
+    if (seenCards.has(i)) c.classList.add('seen');
+  });
+  updateScore();
+
+  // Eval auto-save
+  function saveEval(key) {
+    const ta = document.getElementById(key);
+    localStorage.setItem('ai-eval-' + key, ta.value);
+    const msg = document.getElementById('msg-' + key);
+    msg.textContent = '✓ saved';
+    msg.className = 'saved-msg ok';
+    clearTimeout(ta._t);
+    ta._t = setTimeout(() => { msg.textContent = ''; msg.className = 'saved-msg'; }, 2000);
+  }
+
+  // Restore eval answers
+  document.querySelectorAll('.eval-ta').forEach(ta => {
+    const saved = localStorage.getItem('ai-eval-' + ta.id);
+    if (saved) ta.value = saved;
+  });
+
+  // Checklist
+  function toggleCheck(li, key) {
+    li.classList.toggle('done');
+    localStorage.setItem('ai-check-' + key, li.classList.contains('done') ? '1' : '0');
+  }
+
+  document.querySelectorAll('.checklist li').forEach(li => {
+    if (localStorage.getItem('ai-check-' + li.dataset.key) === '1') li.classList.add('done');
+  });
+</script>
+
+</body>
+</html>
