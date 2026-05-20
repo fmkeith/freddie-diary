@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Macbeth Revision — Freddie Mason</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --red: #c0392b;
+      --red-bright: #e74c3c;
+      --red-dim: #7b241c;
+      --gold: #d4ac0d;
+      --gold-dim: #9a7d0a;
+      --bg: #0d0a0a;
+      --surface: #1a1010;
+      --border: #3d1a1a;
+      --text: #c8c0b8;
+      --dim: #555;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    #bg-canvas {
+      position: fixed; inset: 0;
+      z-index: 0; opacity: 0.04;
+      pointer-events: none;
+    }
+
+    .progress-bar {
+      position: fixed; top: 0; left: 0;
+      height: 2px; background: var(--red-bright);
+      z-index: 300; transition: width 0.05s;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,10,10,0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 48px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-family: Georgia, serif; font-size: 1.1rem; color: var(--gold); letter-spacing: 2px; }
+    header span { font-family: monospace; font-size: 0.72rem; color: var(--dim); }
+
+    /* ── NAV ── */
+    .nav {
+      position: sticky; top: 53px; z-index: 99;
+      background: rgba(13,10,10,0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 11px 48px;
+      display: flex; gap: 8px; overflow-x: auto;
+    }
+    .pill {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--dim); font-family: monospace; font-size: 0.7rem;
+      padding: 5px 14px; border-radius: 20px; cursor: pointer;
+      white-space: nowrap; transition: all 0.15s; letter-spacing: 1px;
+    }
+    .pill:hover, .pill.active { border-color: var(--gold); color: var(--gold); }
+
+    /* ── SECTIONS ── */
+    section {
+      max-width: 880px; margin: 0 auto;
+      padding: 64px 48px;
+      border-bottom: 1px solid var(--border);
+      position: relative; z-index: 1;
+    }
+    .label { font-family: monospace; font-size: 0.68rem; letter-spacing: 3px; color: var(--red-bright); text-transform: uppercase; margin-bottom: 8px; }
+    section h2 { font-size: 1.9rem; color: #fff; margin-bottom: 14px; line-height: 1.2; font-family: Georgia, serif; }
+    section > p { color: var(--text); line-height: 1.75; margin-bottom: 12px; max-width: 640px; }
+
+    /* ── SCORE BAR ── */
+    .score-bar {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 12px 20px; margin-bottom: 20px;
+      font-family: monospace; font-size: 0.82rem;
+    }
+    .score-val { color: var(--gold); font-size: 1.2rem; min-width: 40px; }
+    .score-label { color: var(--dim); }
+    .score-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; }
+    .score-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.4s; }
+
+    /* ── FILTER TABS ── */
+    .filter-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .f-tab {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--dim); font-family: monospace; font-size: 0.7rem;
+      padding: 5px 14px; border-radius: 4px; cursor: pointer;
+      transition: all 0.15s; letter-spacing: 1px;
+    }
+    .f-tab:hover, .f-tab.active { border-color: var(--red-bright); color: var(--red-bright); }
+
+    /* ── FLASH CARDS ── */
+    .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .flash-card { height: 200px; perspective: 900px; cursor: pointer; }
+    .flash-card.hidden { display: none; }
+    .flash-inner {
+      position: relative; width: 100%; height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.77, 0, 0.175, 1);
+    }
+    .flash-card.flipped .flash-inner { transform: rotateY(180deg); }
+
+    .flash-front, .flash-back {
+      position: absolute; inset: 0;
+      backface-visibility: hidden;
+      border-radius: 6px; padding: 22px 24px;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .flash-front { background: var(--surface); border: 1px solid var(--border); }
+    .flash-back { background: #1a0a0a; border: 1px solid var(--red-dim); transform: rotateY(180deg); }
+    .flash-card.seen .flash-front { border-color: var(--gold-dim); }
+
+    .flash-q { font-size: 0.93rem; color: #fff; line-height: 1.5; margin-bottom: 10px; }
+    .flash-a { font-size: 0.86rem; color: #c8c0b8; line-height: 1.65; }
+    .flash-hint { font-family: monospace; font-size: 0.62rem; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-top: auto; }
+    .flash-topic { font-family: monospace; font-size: 0.62rem; color: var(--red-bright); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+
+    .flash-quote {
+      font-family: Georgia, serif;
+      font-style: italic;
+      color: var(--gold);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      border-left: 2px solid var(--red-dim);
+      padding-left: 12px;
+      margin-bottom: 10px;
+    }
+
+    /* ── CONTROLS ── */
+    .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+    .btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--dim); font-family: monospace; font-size: 0.75rem;
+      padding: 7px 16px; border-radius: 4px; cursor: pointer;
+      letter-spacing: 1px; transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--gold); color: var(--gold); }
+    .btn.primary { border-color: var(--red-bright); color: var(--red-bright); }
+    .btn.primary:hover { background: var(--red-bright); color: #fff; }
+
+    /* ── QUOTE BANK ── */
+    .quote-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 3px solid var(--red-bright);
+      border-radius: 0 6px 6px 0;
+      padding: 18px 22px; margin-bottom: 14px;
+    }
+    .quote-text {
+      font-family: Georgia, serif; font-style: italic;
+      color: var(--gold); font-size: 1rem; line-height: 1.6; margin-bottom: 10px;
+    }
+    .quote-speaker { font-family: monospace; font-size: 0.7rem; color: var(--red-bright); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+    .quote-analysis { font-size: 0.85rem; color: #aaa; line-height: 1.65; }
+    .quote-theme {
+      display: inline-block; font-family: monospace; font-size: 0.65rem;
+      padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border);
+      color: var(--dim); margin-top: 8px; margin-right: 4px; letter-spacing: 1px;
+    }
+
+    /* ── CHARACTER CARDS ── */
+    .char-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 16px; }
+    .char-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 20px;
+      cursor: pointer; transition: border-color 0.15s;
+    }
+    .char-card:hover { border-color: var(--red-dim); }
+    .char-name { font-family: Georgia, serif; font-size: 1rem; color: #fff; margin-bottom: 6px; }
+    .char-role { font-family: monospace; font-size: 0.65rem; color: var(--red-bright); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+    .char-desc { font-size: 0.83rem; color: #aaa; line-height: 1.6; }
+    .char-quote { font-family: Georgia, serif; font-style: italic; font-size: 0.8rem; color: var(--gold); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+    /* ── TEXT EVALUATION ── */
+    .eval-extract {
+      background: #000; border: 1px solid var(--border);
+      border-left: 4px solid var(--red-bright);
+      border-radius: 0 6px 6px 0;
+      padding: 24px 28px; margin: 20px 0;
+    }
+    .extract-context { font-family: monospace; font-size: 0.68rem; color: var(--dim); letter-spacing: 1px; margin-bottom: 14px; }
+    .extract-text {
+      font-family: Georgia, serif; font-size: 0.96rem;
+      line-height: 1.9; color: #d8d0c8;
+    }
+    .extract-text em { color: var(--gold); font-style: normal; font-weight: bold; }
+
+    .text-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+    .text-tab {
+      padding: 9px 20px; font-family: monospace; font-size: 0.7rem;
+      color: var(--dim); cursor: pointer; border-bottom: 2px solid transparent;
+      transition: all 0.15s; letter-spacing: 1px;
+    }
+    .text-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .text-panel { display: none; }
+    .text-panel.active { display: block; }
+
+    .eval-q { margin-bottom: 22px; }
+    .eval-q-label { font-family: monospace; font-size: 0.72rem; color: var(--red-bright); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+    .eval-q-text { font-size: 0.93rem; color: #fff; margin-bottom: 6px; line-height: 1.5; }
+    .eval-hint { font-size: 0.8rem; color: var(--dim); margin-bottom: 8px; font-style: italic; }
+    .eval-ta {
+      width: 100%; background: #0a0505;
+      border: 1px solid var(--border); border-radius: 4px;
+      color: #fff; font-family: Georgia, serif;
+      font-size: 0.88rem; padding: 12px 14px;
+      resize: vertical; outline: none; line-height: 1.7;
+      min-height: 90px; transition: border-color 0.15s;
+    }
+    .eval-ta:focus { border-color: var(--red-bright); }
+    .eval-ta::placeholder { color: #2a1a1a; font-style: italic; }
+    .saved-msg { font-family: monospace; font-size: 0.66rem; color: var(--dim); letter-spacing: 1px; margin-top: 5px; height: 14px; }
+    .saved-msg.ok { color: var(--gold); }
+
+    /* ── THEMES SECTION ── */
+    .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+    .theme-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px 22px; }
+    .theme-name { font-family: Georgia, serif; font-size: 1rem; color: var(--gold); margin-bottom: 8px; }
+    .theme-desc { font-size: 0.86rem; color: #aaa; line-height: 1.65; margin-bottom: 10px; }
+    .theme-quotes { font-family: Georgia, serif; font-style: italic; font-size: 0.8rem; color: #888; border-top: 1px solid var(--border); padding-top: 10px; line-height: 1.6; }
+
+    /* ── CHECKLIST ── */
+    .checklist { list-style: none; margin: 16px 0; }
+    .checklist li {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 11px 0; border-bottom: 1px solid var(--border);
+      font-size: 0.9rem; cursor: pointer; user-select: none;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .check-box {
+      width: 18px; height: 18px; border: 1px solid var(--border);
+      border-radius: 3px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; color: var(--gold); transition: all 0.15s; margin-top: 2px;
+    }
+    .checklist li.done .check-box { background: var(--gold); border-color: var(--gold); color: #000; }
+    .checklist li.done span { color: var(--dim); text-decoration: line-through; }
+
+    .section-divider { font-family: monospace; font-size: 0.72rem; color: var(--red-bright); letter-spacing: 2px; text-transform: uppercase; margin: 28px 0 12px; }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="progress-bar" id="prog"></div>
+
+<header>
+  <h1>Macbeth — GCSE English Revision</h1>
+  <span>Freddie Mason · Year 10 · 2026</span>
+</header>
+
+<nav class="nav">
+  <div class="pill active" data-target="flashcards">Flash Cards</div>
+  <div class="pill" data-target="characters">Characters</div>
+  <div class="pill" data-target="themes">Themes</div>
+  <div class="pill" data-target="quotes">Quote Bank</div>
+  <div class="pill" data-target="evaluate">Analyse Extracts</div>
+  <div class="pill" data-target="checklist">Checklist</div>
+</nav>
+
+<main>
+
+  <!-- ── FLASH CARDS ── -->
+  <section id="flashcards">
+    <div class="label">01 · Flash Cards</div>
+    <h2>Test yourself.<br>Tap to flip.</h2>
+    <p>Cover the answer, think about it, then flip. Work through all categories. Your progress is saved automatically.</p>
+
+    <div class="score-bar">
+      <div class="score-val" id="seen-count">0</div>
+      <div class="score-label">of 16 cards seen</div>
+      <div class="score-track"><div class="score-fill" id="seen-fill" style="width:0%"></div></div>
+      <button class="btn" onclick="resetCards()">↺ Reset</button>
+    </div>
+
+    <div class="filter-tabs">
+      <div class="f-tab active" data-filter="all">All</div>
+      <div class="f-tab" data-filter="plot">Plot</div>
+      <div class="f-tab" data-filter="character">Character</div>
+      <div class="f-tab" data-filter="theme">Theme</div>
+      <div class="f-tab" data-filter="context">Context</div>
+      <div class="f-tab" data-filter="language">Language</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" onclick="flipAll(true)">Reveal all</button>
+      <button class="btn" onclick="flipAll(false)">Hide all</button>
+    </div>
+
+    <div class="cards-grid" id="cards-grid">
+
+      <div class="flash-card" data-cat="plot" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">Summarise the plot of Macbeth in five steps.</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Plot</div>
+            <div class="flash-a">1. Witches prophecy — Macbeth will be king.<br>2. Macbeth kills Duncan with Lady Macbeth's encouragement.<br>3. Macbeth becomes king, has Banquo murdered.<br>4. Lady Macbeth goes mad; Macbeth loses control.<br>5. Macduff kills Macbeth; Malcolm becomes king.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="plot" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">Why is Banquo significant to the plot?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Plot</div>
+            <div class="flash-a">The witches prophesy Banquo's sons will be kings. This makes him a threat — so Macbeth has him murdered. Banquo's ghost then haunts Macbeth at the banquet, representing his guilt and paranoia spiralling out of control.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="character" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How does Macbeth change throughout the play?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Character</div>
+            <div class="flash-a">He begins as a brave, loyal soldier. Ambition and Lady Macbeth's manipulation lead him to murder. Each crime makes the next easier — he orders murders without her. By the end he is a tyrant, isolated and desensitised to death: <em>"I have supped full with horrors."</em></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="character" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How is Lady Macbeth presented? Does she change?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Character</div>
+            <div class="flash-a">Initially dominant, ruthless, and manipulative — she calls on spirits to "unsex" her. She plans Duncan's murder and controls Macbeth. But guilt destroys her: she sleepwalks, hallucinates blood, and takes her own life. She is ultimately more fragile than she appears.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="character" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">What is the role of the Three Witches?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Character</div>
+            <div class="flash-a">They represent the supernatural, fate, and temptation. They don't force Macbeth — they trigger his ambition. Their prophecies are technically true but misleading. They raise the question: is Macbeth fated, or does he choose evil?</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="theme" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How does Shakespeare present the theme of ambition?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Theme</div>
+            <div class="flash-a">Ambition drives the entire plot. Shakespeare presents it as destructive — Macbeth's "vaulting ambition which o'erleaps itself" leads to tyranny and self-destruction. But Lady Macbeth's ambition is also her downfall. Ambition unchecked by morality is the play's central warning.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="theme" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How is guilt presented in Macbeth?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Theme</div>
+            <div class="flash-a">Guilt manifests physically — Macbeth sees a dagger and Banquo's ghost; Lady Macbeth obsessively washes invisible blood. <em>"Will all great Neptune's ocean wash this blood clean from my hand?"</em> Shakespeare suggests guilt is inescapable and ultimately fatal.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="theme" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How does Shakespeare explore the theme of power?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Theme</div>
+            <div class="flash-a">Power obtained wrongly corrupts absolutely. Duncan's legitimate power creates loyalty; Macbeth's stolen power creates only fear. Shakespeare uses Malcolm's restoration to suggest true power must be earned, not seized. The divine right of kings is a key Jacobean idea here.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="theme" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">What does "appearance vs reality" mean in Macbeth? Give examples.</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Theme</div>
+            <div class="flash-a"><em>"Fair is foul and foul is fair"</em> — the witches introduce this from the start. Macbeth appears loyal but plans murder. Lady Macbeth tells him to "look like the innocent flower, but be the serpent under't." Nothing is what it seems.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="context" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">Why was James I significant to Macbeth?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Context</div>
+            <div class="flash-a">Shakespeare wrote Macbeth (c.1606) partly to flatter King James I. James was obsessed with witchcraft (he wrote <em>Daemonologie</em>). He was also descended from Banquo — so the witches' prophecy about Banquo's sons becoming kings is a compliment to James. The play also reflects the 1605 Gunpowder Plot — a direct attack on a king.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="context" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">What was the "divine right of kings" and how does it feature in Macbeth?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Context</div>
+            <div class="flash-a">The idea that God appointed kings — killing one was therefore a sin against God as well as the law. This is why Duncan's murder is presented as so horrific. Macbeth disrupts the natural order (<em>"nature seems dead"</em>) and the country suffers until the rightful line is restored.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="context" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How were women viewed in Jacobean society? How does this affect Lady Macbeth's character?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Context</div>
+            <div class="flash-a">Women were seen as weak, passive, and subordinate. Lady Macbeth rejects this — she asks to be "unsexed" to gain masculine strength. Her power is transgressive and seen as unnatural. Shakespeare may be suggesting women who seek power beyond their role face destruction — she dies while Macbeth fights to the end.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="language" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">What is a soliloquy and why does Shakespeare use them?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Language</div>
+            <div class="flash-a">A speech given alone on stage — it reveals a character's private thoughts. In <em>"Is this a dagger which I see before me"</em>, Shakespeare shows Macbeth's hallucinating, guilty mind before the murder. Soliloquies create intimacy — we know more than other characters do.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="language" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How does Shakespeare use imagery of blood in the play?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Language</div>
+            <div class="flash-a">Blood symbolises both bravery (early — "brave" Macbeth in battle) and guilt (later — <em>"Out, damned spot!"</em>). The progression of blood imagery tracks the moral collapse of both Macbeth and Lady Macbeth. It is inescapable — even the ocean cannot wash it away.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="language" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">How does Shakespeare use light and darkness imagery?</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Language</div>
+            <div class="flash-a">Light represents goodness, truth, and the natural order. Darkness represents evil, secrecy, and chaos. Lady Macbeth calls on <em>"thick night"</em> to hide her deeds. Macbeth tells the stars to <em>"hide your fires"</em>. Evil thrives in darkness — and when it is exposed to light, it collapses.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flash-card" data-cat="language" onclick="flipCard(this)">
+        <div class="flash-inner">
+          <div class="flash-front"><div class="flash-q">What is dramatic irony? Give an example from Macbeth.</div><div class="flash-hint">tap to reveal ▸</div></div>
+          <div class="flash-back">
+            <div class="flash-topic">Language</div>
+            <div class="flash-a">When the audience knows something a character doesn't. Duncan says <em>"He was a gentleman on whom I built an absolute trust"</em> — referring to the traitorous Thane of Cawdor, but he is about to make the same mistake trusting Macbeth. The audience knows Macbeth plans to murder him.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── CHARACTERS ── -->
+  <section id="characters">
+    <div class="label">02 · Characters</div>
+    <h2>Know them inside out.</h2>
+    <p>For each character you need: their role, how they change, their key quotes, and what they represent thematically.</p>
+
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-name">Macbeth</div>
+        <div class="char-role">Tragic Hero · Protagonist</div>
+        <div class="char-desc">Brave soldier corrupted by ambition. His fatal flaw is being too easily influenced — by the witches, by Lady Macbeth, by his own imagination. He retains some nobility until the very end when he dies fighting.</div>
+        <div class="char-quote">"I am in blood stepped in so far that, should I wade no more, returning were as tedious as go o'er."</div>
+      </div>
+
+      <div class="char-card">
+        <div class="char-name">Lady Macbeth</div>
+        <div class="char-role">Antagonist · Foil to Macbeth</div>
+        <div class="char-desc">Dominant and calculating at first. She suppresses her conscience to pursue power but cannot sustain it — guilt destroys her. She inverts expected gender roles, which Shakespeare presents as unnatural and doomed.</div>
+        <div class="char-quote">"Out, damned spot! out, I say!"</div>
+      </div>
+
+      <div class="char-card">
+        <div class="char-name">The Three Witches</div>
+        <div class="char-role">Supernatural · Catalyst</div>
+        <div class="char-desc">Represent fate, the supernatural, and temptation. They don't create Macbeth's ambition — they reveal it. Their prophecies are true but deliberately misleading. They open and close the moral chaos of the play.</div>
+        <div class="char-quote">"Fair is foul, and foul is fair."</div>
+      </div>
+
+      <div class="char-card">
+        <div class="char-name">Banquo</div>
+        <div class="char-role">Foil to Macbeth · Moral Compass</div>
+        <div class="char-desc">Also hears the witches' prophecy but resists temptation. He represents the path Macbeth could have taken — noble, loyal, suspicious but not corrupted. His ghost is Macbeth's guilt made visible.</div>
+        <div class="char-quote">"Thou hast it now: King, Cawdor, Glamis, all, as the weird women promised, and I fear thou play'dst most foully for't."</div>
+      </div>
+
+      <div class="char-card">
+        <div class="char-name">Duncan</div>
+        <div class="char-role">King · Symbol of Legitimate Order</div>
+        <div class="char-desc">Represents the ideal king — just, generous, and beloved. His murder isn't just personal — it disrupts the divine order of the entire kingdom. His goodness makes Macbeth's crime more heinous.</div>
+        <div class="char-quote">"He was a gentleman on whom I built an absolute trust."</div>
+      </div>
+
+      <div class="char-card">
+        <div class="char-name">Macduff</div>
+        <div class="char-role">Hero · Avenger</div>
+        <div class="char-desc">Represents loyalty, justice, and Scotland's restoration. He suspects Macbeth early. The murder of his family — ordered by Macbeth — makes his eventual killing of Macbeth feel like righteous justice, not revenge.</div>
+        <div class="char-quote">"He has no children... What, all my pretty chickens and their dam at one fell swoop?"</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── THEMES ── -->
+  <section id="themes">
+    <div class="label">03 · Themes</div>
+    <h2>The big ideas<br>Shakespeare explores.</h2>
+    <p>In the exam you'll need to write about themes using evidence. For each theme: say what it is, how Shakespeare presents it, and link to quotes and context.</p>
+
+    <div class="theme-grid">
+      <div class="theme-card">
+        <div class="theme-name">Ambition</div>
+        <div class="theme-desc">The central driving force. Macbeth's ambition is presented as "vaulting" — it overshoots itself. Shakespeare shows ambition without moral restraint leading to tyranny and self-destruction. Lady Macbeth's ambition is equally destructive.</div>
+        <div class="theme-quotes">"I have no spur to prick the sides of my intent, but only vaulting ambition, which o'erleaps itself."</div>
+      </div>
+
+      <div class="theme-card">
+        <div class="theme-name">Guilt</div>
+        <div class="theme-desc">Guilt cannot be escaped. Both Macbeth and Lady Macbeth are destroyed by it — through hallucinations, sleeplessness, and eventually death. Shakespeare suggests a guilty conscience is the truest punishment.</div>
+        <div class="theme-quotes">"Will all great Neptune's ocean wash this blood clean from my hand? No, this my hand will rather the multitudinous seas incarnadine."</div>
+      </div>
+
+      <div class="theme-card">
+        <div class="theme-name">The Supernatural</div>
+        <div class="theme-desc">Witches, prophecies, ghosts, and visions pervade the play. Shakespeare leaves ambiguous whether these are real or products of guilty imagination — this uncertainty is deliberate. Jacobean audiences believed genuinely in witchcraft.</div>
+        <div class="theme-quotes">"Is this a dagger which I see before me, the handle toward my hand?"</div>
+      </div>
+
+      <div class="theme-card">
+        <div class="theme-name">Appearance vs Reality</div>
+        <div class="theme-desc">Nothing is what it seems. The witches' prophecies mislead. Macbeth appears loyal. Lady Macbeth appears gracious. Shakespeare uses this theme to suggest that evil masks itself — until it cannot.</div>
+        <div class="theme-quotes">"Look like the innocent flower, but be the serpent under't."</div>
+      </div>
+
+      <div class="theme-card">
+        <div class="theme-name">Power & Kingship</div>
+        <div class="theme-desc">Legitimate power (Duncan, Malcolm) brings prosperity. Stolen power (Macbeth) brings chaos and suffering. Shakespeare endorses the divine right of kings — a direct compliment to James I — suggesting God-appointed rule is the natural order.</div>
+        <div class="theme-quotes">"Gracious England... 'gainst the undivulged pretence I fight of treasonous malice."</div>
+      </div>
+
+      <div class="theme-card">
+        <div class="theme-name">Gender & Masculinity</div>
+        <div class="theme-desc">Lady Macbeth subverts gender expectations. Macbeth is manipulated through his sense of masculinity ("Are you a man?"). Shakespeare questions what "masculine" truly means — physical violence or moral strength?</div>
+        <div class="theme-quotes">"Unsex me here, and fill me from the crown to the toe top-full of direst cruelty."</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── QUOTE BANK ── -->
+  <section id="quotes">
+    <div class="label">04 · Quote Bank</div>
+    <h2">Learn these.<br>Analyse them.</h2>
+    <p>For each quote you need to know: who says it, when, what it means, and what technique Shakespeare uses. Don't just memorise — understand.</p>
+
+    <div class="section-divider">Macbeth</div>
+
+    <div class="quote-card">
+      <div class="quote-speaker">Macbeth — Act 1</div>
+      <div class="quote-text">"Stars, hide your fires; let not light see my black and deep desires."</div>
+      <div class="quote-analysis">Said after Duncan announces Malcolm as heir — Macbeth is already thinking of murder. The contrast of light and dark mirrors the theme of appearance vs reality. He wants to hide his true nature even from the natural world. "Black and deep" suggests his desires are both evil and buried.</div>
+      <span class="quote-theme">ambition</span><span class="quote-theme">appearance vs reality</span><span class="quote-theme">light/dark imagery</span>
+    </div>
+
+    <div class="quote-card">
+      <div class="quote-speaker">Macbeth — Act 2</div>
+      <div class="quote-text">"Will all great Neptune's ocean wash this blood clean from my hand?"</div>
+      <div class="quote-analysis">Immediately after Duncan's murder. The hyperbole of "great Neptune's ocean" shows the scale of his guilt — it is oceanic, uncontainable. Blood symbolises guilt that cannot be removed. Dramatically ironic when later Lady Macbeth obsessively tries to wash blood from her hands.</div>
+      <span class="quote-theme">guilt</span><span class="quote-theme">blood imagery</span><span class="quote-theme">hyperbole</span>
+    </div>
+
+    <div class="quote-card">
+      <div class="quote-speaker">Macbeth — Act 3</div>
+      <div class="quote-text">"I am in blood stepped in so far that, should I wade no more, returning were as tedious as go o'er."</div>
+      <div class="quote-analysis">A key turning point — Macbeth accepts he is beyond redemption. The metaphor of wading through blood shows how he is trapped by his own crimes. "Tedious" is chilling — it shows he now views murder as merely inconvenient rather than horrifying. His moral collapse is complete.</div>
+      <span class="quote-theme">guilt</span><span class="quote-theme">ambition</span><span class="quote-theme">metaphor</span>
+    </div>
+
+    <div class="section-divider">Lady Macbeth</div>
+
+    <div class="quote-card">
+      <div class="quote-speaker">Lady Macbeth — Act 1</div>
+      <div class="quote-text">"Unsex me here, and fill me from the crown to the toe top-full of direst cruelty."</div>
+      <div class="quote-analysis">Lady Macbeth calls on spirits to remove her femininity so she can commit murder. "Unsex" reflects Jacobean belief that women were incapable of extreme violence. She rejects her gender role — which Shakespeare presents as transgressive and ultimately self-destructive. The word "direst" shows the extremity she seeks.</div>
+      <span class="quote-theme">gender</span><span class="quote-theme">supernatural</span><span class="quote-theme">power</span>
+    </div>
+
+    <div class="quote-card">
+      <div class="quote-speaker">Lady Macbeth — Act 5</div>
+      <div class="quote-text">"Out, damned spot! out, I say!"</div>
+      <div class="quote-analysis">Lady Macbeth sleepwalking, trying to wash imaginary blood from her hands. Ironically echoes her earlier confidence — "A little water clears us of this deed." The fragmented syntax and repetition show her mental disintegration. She who suppressed guilt is now consumed by it. The "spot" she cannot remove is her guilt made physical.</div>
+      <span class="quote-theme">guilt</span><span class="quote-theme">blood imagery</span><span class="quote-theme">dramatic irony</span>
+    </div>
+
+    <div class="section-divider">The Witches</div>
+
+    <div class="quote-card">
+      <div class="quote-speaker">The Witches — Act 1</div>
+      <div class="quote-text">"Fair is foul, and foul is fair."</div>
+      <div class="quote-analysis">The paradox that opens the play establishes its central theme — nothing is as it appears. Good and evil are inverted. This single line foreshadows every act of deception in the play. The chiasmus (mirror structure) reflects the inversion of the natural order that Macbeth's crimes will cause.</div>
+      <span class="quote-theme">appearance vs reality</span><span class="quote-theme">supernatural</span><span class="quote-theme">paradox</span>
+    </div>
+  </section>
+
+  <!-- ── EVALUATE EXTRACTS ── -->
+  <section id="evaluate">
+    <div class="label">05 · Analyse Extracts</div>
+    <h2>Read, analyse,<br>write.</h2>
+    <p>GCSE questions ask you to analyse how Shakespeare presents a theme or character in an extract and the rest of the play. Practise the method: point → evidence → effect → link to theme/context.</p>
+
+    <div class="text-tabs">
+      <div class="text-tab active" data-panel="ext1">Extract 1 — Ambition</div>
+      <div class="text-tab" data-panel="ext2">Extract 2 — Guilt</div>
+      <div class="text-tab" data-panel="ext3">Extract 3 — Lady Macbeth</div>
+    </div>
+
+    <!-- EXTRACT 1 -->
+    <div class="text-panel active" id="ext1">
+      <div class="eval-extract">
+        <div class="extract-context">Act 1, Scene 7 — Macbeth alone, before Duncan's murder</div>
+        <div class="extract-text">
+          "If it were done when 'tis done, then 'twere well<br>
+          It were done quickly: if the assassination<br>
+          Could trammel up the consequence, and catch<br>
+          With his surcease success; that but this blow<br>
+          Might be the be-all and the end-all here...<br><br>
+          I have no spur<br>
+          To prick the sides of my intent, but only<br>
+          <em>Vaulting ambition</em>, which o'erleaps itself<br>
+          And falls on the other."
+        </div>
+      </div>
+
+      <div class="eval-questions">
+        <div class="eval-q">
+          <div class="eval-q-label">Q1 · First Impressions</div>
+          <div class="eval-q-text">What is Macbeth thinking about in this soliloquy? What does his hesitation suggest about his character?</div>
+          <div class="eval-hint">He's weighing up the murder — what does that tell us about who he still is at this point?</div>
+          <textarea class="eval-ta" id="e1q1" placeholder="Write here..." oninput="saveEval('e1q1')"></textarea>
+          <div class="saved-msg" id="msg-e1q1"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q2 · Language Analysis</div>
+          <div class="eval-q-text">Analyse the metaphor "vaulting ambition, which o'erleaps itself." What does Shakespeare suggest about ambition here?</div>
+          <div class="eval-hint">Think: what is vaulting? What happens when a vaulter o'erleaps? What does this say about the nature of ambition?</div>
+          <textarea class="eval-ta" id="e1q2" placeholder="Write here..." oninput="saveEval('e1q2')"></textarea>
+          <div class="saved-msg" id="msg-e1q2"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q3 · Form & Structure</div>
+          <div class="eval-q-text">This is a soliloquy. Why does Shakespeare choose this form for this moment? What does the audience learn that no other character knows?</div>
+          <div class="eval-hint">What's the dramatic effect of being alone with Macbeth's thoughts here?</div>
+          <textarea class="eval-ta" id="e1q3" placeholder="Write here..." oninput="saveEval('e1q3')"></textarea>
+          <div class="saved-msg" id="msg-e1q3"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q4 · Wider Play</div>
+          <div class="eval-q-text">How does Shakespeare present ambition elsewhere in the play? Refer to at least one other moment and one quote.</div>
+          <div class="eval-hint">Think about Lady Macbeth, or the later Macbeth who has stopped hesitating entirely.</div>
+          <textarea class="eval-ta" id="e1q4" placeholder="Write here..." oninput="saveEval('e1q4')"></textarea>
+          <div class="saved-msg" id="msg-e1q4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXTRACT 2 -->
+    <div class="text-panel" id="ext2">
+      <div class="eval-extract">
+        <div class="extract-context">Act 2, Scene 2 — Immediately after Duncan's murder</div>
+        <div class="extract-text">
+          <em>Macbeth:</em> "I have done the deed. Didst thou not hear a noise?..."<br><br>
+          "Methought I heard a voice cry 'Sleep no more!<br>
+          Macbeth does murder sleep' — the innocent sleep,<br>
+          Sleep that knits up the ravelled sleeve of care...<br>
+          Glamis hath murdered sleep, and therefore Cawdor<br>
+          Shall sleep no more; <em>Macbeth shall sleep no more.</em>"
+        </div>
+      </div>
+
+      <div class="eval-questions">
+        <div class="eval-q">
+          <div class="eval-q-label">Q1 · Symbolism</div>
+          <div class="eval-q-text">What does "sleep" symbolise in this extract? What does murdering sleep mean for Macbeth?</div>
+          <div class="eval-hint">Sleep = innocence, peace, rest. What has Macbeth lost by committing this murder?</div>
+          <textarea class="eval-ta" id="e2q1" placeholder="Write here..." oninput="saveEval('e2q1')"></textarea>
+          <div class="saved-msg" id="msg-e2q1"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q2 · Language</div>
+          <div class="eval-q-text">Analyse "Sleep that knits up the ravelled sleeve of care." What technique is used and what effect does it create?</div>
+          <div class="eval-hint">It's a metaphor — what does sleep do to worry? What does "ravelled sleeve" suggest?</div>
+          <textarea class="eval-ta" id="e2q2" placeholder="Write here..." oninput="saveEval('e2q2')"></textarea>
+          <div class="saved-msg" id="msg-e2q2"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q3 · Character</div>
+          <div class="eval-q-text">Compare Macbeth's state of mind here with Lady Macbeth's in the same scene. Who seems more in control?</div>
+          <div class="eval-hint">Lady Macbeth says "A little water clears us of this deed." How does this contrast with Macbeth?</div>
+          <textarea class="eval-ta" id="e2q3" placeholder="Write here..." oninput="saveEval('e2q3')"></textarea>
+          <div class="saved-msg" id="msg-e2q3"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q4 · Full Essay Paragraph</div>
+          <div class="eval-q-text">Write a full GCSE-style paragraph on how Shakespeare presents guilt in this extract. Use: Point · Evidence · Effect · Context.</div>
+          <div class="eval-hint">Start with a clear point about guilt, embed a quote, analyse the technique, link to Jacobean context or the rest of the play.</div>
+          <textarea class="eval-ta" id="e2q4" style="min-height:130px" placeholder="Write your paragraph here..." oninput="saveEval('e2q4')"></textarea>
+          <div class="saved-msg" id="msg-e2q4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXTRACT 3 -->
+    <div class="text-panel" id="ext3">
+      <div class="eval-extract">
+        <div class="extract-context">Act 1, Scene 5 — Lady Macbeth reads Macbeth's letter, alone</div>
+        <div class="extract-text">
+          "Come, you spirits<br>
+          That tend on mortal thoughts, unsex me here,<br>
+          And fill me from the crown to the toe top-full<br>
+          Of direst cruelty! make thick my blood;<br>
+          Stop up the access and passage to remorse,<br>
+          That no compunctious visitings of nature<br>
+          Shake my fell purpose, nor keep peace between<br>
+          The effect and it! Come to my woman's breasts,<br>
+          And take my milk for gall."
+        </div>
+      </div>
+
+      <div class="eval-questions">
+        <div class="eval-q">
+          <div class="eval-q-label">Q1 · Character</div>
+          <div class="eval-q-text">What does Lady Macbeth ask for in this speech? What does this reveal about her character at this point?</div>
+          <div class="eval-hint">She's asking to be made cruel. But why does she need to ask? What does that suggest is actually there?</div>
+          <textarea class="eval-ta" id="e3q1" placeholder="Write here..." oninput="saveEval('e3q1')"></textarea>
+          <div class="saved-msg" id="msg-e3q1"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q2 · Gender & Context</div>
+          <div class="eval-q-text">Why does Lady Macbeth ask to be "unsexed"? What does this tell us about Jacobean views of women?</div>
+          <div class="eval-hint">In 1606, what were women expected to be? Why would she need supernatural help to commit murder?</div>
+          <textarea class="eval-ta" id="e3q2" placeholder="Write here..." oninput="saveEval('e3q2')"></textarea>
+          <div class="saved-msg" id="msg-e3q2"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q3 · Foreshadowing</div>
+          <div class="eval-q-text">Lady Macbeth asks spirits to "stop up the access and passage to remorse." How does Act 5 show that they did not succeed?</div>
+          <div class="eval-hint">What happens to Lady Macbeth in Act 5? What does this say about whether guilt can truly be suppressed?</div>
+          <textarea class="eval-ta" id="e3q3" placeholder="Write here..." oninput="saveEval('e3q3')"></textarea>
+          <div class="saved-msg" id="msg-e3q3"></div>
+        </div>
+        <div class="eval-q">
+          <div class="eval-q-label">Q4 · Exam Question</div>
+          <div class="eval-q-text">How does Shakespeare present Lady Macbeth as a powerful character in this extract and elsewhere in the play? Write a full response.</div>
+          <div class="eval-hint">Cover: language in the extract, her relationship with Macbeth, how she changes, what she represents. Use at least two quotes.</div>
+          <textarea class="eval-ta" id="e3q4" style="min-height:160px" placeholder="Write your full response here..." oninput="saveEval('e3q4')"></textarea>
+          <div class="saved-msg" id="msg-e3q4"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CHECKLIST ── -->
+  <section id="checklist">
+    <div class="label">06 · Checklist</div>
+    <h2>Track your confidence.</h2>
+    <p>Tick off as you feel ready. Your progress is saved in the browser.</p>
+
+    <ul class="checklist">
+      <li onclick="toggleCheck(this,'mb1')" data-key="mb1"><div class="check-box">✓</div><span>I can summarise the full plot of Macbeth clearly</span></li>
+      <li onclick="toggleCheck(this,'mb2')" data-key="mb2"><div class="check-box">✓</div><span>I can analyse how Macbeth changes throughout the play</span></li>
+      <li onclick="toggleCheck(this,'mb3')" data-key="mb3"><div class="check-box">✓</div><span>I can write about Lady Macbeth's role and her downfall</span></li>
+      <li onclick="toggleCheck(this,'mb4')" data-key="mb4"><div class="check-box">✓</div><span>I can explain the role of the witches and what they represent</span></li>
+      <li onclick="toggleCheck(this,'mb5')" data-key="mb5"><div class="check-box">✓</div><span>I can write about ambition as a theme with quotes and evidence</span></li>
+      <li onclick="toggleCheck(this,'mb6')" data-key="mb6"><div class="check-box">✓</div><span>I can write about guilt as a theme with quotes and evidence</span></li>
+      <li onclick="toggleCheck(this,'mb7')" data-key="mb7"><div class="check-box">✓</div><span>I can explain the theme of appearance vs reality</span></li>
+      <li onclick="toggleCheck(this,'mb8')" data-key="mb8"><div class="check-box">✓</div><span>I know at least 6 key quotes and can analyse them</span></li>
+      <li onclick="toggleCheck(this,'mb9')" data-key="mb9"><div class="check-box">✓</div><span>I can use context (James I, divine right, Jacobean views of women)</span></li>
+      <li onclick="toggleCheck(this,'mb10')" data-key="mb10"><div class="check-box">✓</div><span>I can write a GCSE-style paragraph: Point · Evidence · Effect · Context</span></li>
+      <li onclick="toggleCheck(this,'mb11')" data-key="mb11"><div class="check-box">✓</div><span>I have completed at least one full extract analysis</span></li>
+      <li onclick="toggleCheck(this,'mb12')" data-key="mb12"><div class="check-box">✓</div><span>I have worked through all 16 flash cards</span></li>
+    </ul>
+  </section>
+
+</main>
+
+<script>
+  // Candle-flicker background (red/amber particles instead of binary)
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const cols = Math.floor(canvas.width / 18);
+  const drops = Array(cols).fill(1);
+  const chars = ['᚛','᚜','ᚐ','ᚑ','ᚒ','✦','⚔','†','✝'].concat('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
+  setInterval(() => {
+    ctx.fillStyle = 'rgba(13,10,10,0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#8b1a1a';
+    ctx.font = '16px Georgia';
+    for (let i = 0; i < drops.length; i++) {
+      ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * 18, drops[i] * 18);
+      if (drops[i] * 18 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }, 50);
+  window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+  // Scroll progress
+  window.addEventListener('scroll', () => {
+    document.getElementById('prog').style.width = (window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100) + '%';
+    updatePills();
+  });
+
+  // Nav pills
+  document.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => document.getElementById(p.dataset.target)?.scrollIntoView({ behavior: 'smooth' }));
+  });
+  function updatePills() {
+    let current = '';
+    document.querySelectorAll('section').forEach(s => { if (window.scrollY >= s.offsetTop - 130) current = s.id; });
+    document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.target === current));
+  }
+
+  // Text tabs
+  document.querySelectorAll('.text-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      tab.closest('section').querySelectorAll('.text-tab').forEach(t => t.classList.remove('active'));
+      tab.closest('section').querySelectorAll('.text-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+  });
+
+  // Filter tabs
+  document.querySelectorAll('.f-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.f-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const filter = tab.dataset.filter;
+      document.querySelectorAll('.flash-card').forEach(card => {
+        card.classList.toggle('hidden', filter !== 'all' && card.dataset.cat !== filter);
+      });
+    });
+  });
+
+  // Flash cards
+  const TOTAL = 16;
+  let seenCards = new Set(JSON.parse(localStorage.getItem('mb-seen') || '[]'));
+
+  function flipCard(card) {
+    card.classList.toggle('flipped');
+    if (card.classList.contains('flipped')) {
+      const idx = [...document.querySelectorAll('.flash-card')].indexOf(card);
+      seenCards.add(idx);
+      card.classList.add('seen');
+      localStorage.setItem('mb-seen', JSON.stringify([...seenCards]));
+      updateScore();
+    }
+  }
+
+  function updateScore() {
+    document.getElementById('seen-count').textContent = seenCards.size;
+    document.getElementById('seen-fill').style.width = (seenCards.size / TOTAL * 100) + '%';
+  }
+
+  function flipAll(open) {
+    document.querySelectorAll('.flash-card:not(.hidden)').forEach((c, i) => {
+      if (open) { c.classList.add('flipped', 'seen'); seenCards.add(i); }
+      else c.classList.remove('flipped');
+    });
+    if (open) { localStorage.setItem('mb-seen', JSON.stringify([...seenCards])); updateScore(); }
+  }
+
+  function resetCards() {
+    document.querySelectorAll('.flash-card').forEach(c => c.classList.remove('flipped', 'seen'));
+    seenCards.clear(); localStorage.removeItem('mb-seen'); updateScore();
+  }
+
+  document.querySelectorAll('.flash-card').forEach((c, i) => { if (seenCards.has(i)) c.classList.add('seen'); });
+  updateScore();
+
+  // Eval save
+  function saveEval(key) {
+    localStorage.setItem('mb-eval-' + key, document.getElementById(key).value);
+    const msg = document.getElementById('msg-' + key);
+    msg.textContent = '✓ saved'; msg.className = 'saved-msg ok';
+    clearTimeout(window['_t' + key]);
+    window['_t' + key] = setTimeout(() => { msg.textContent = ''; msg.className = 'saved-msg'; }, 2000);
+  }
+  document.querySelectorAll('.eval-ta').forEach(ta => {
+    const v = localStorage.getItem('mb-eval-' + ta.id);
+    if (v) ta.value = v;
+  });
+
+  // Checklist
+  function toggleCheck(li, key) {
+    li.classList.toggle('done');
+    localStorage.setItem('mb-check-' + key, li.classList.contains('done') ? '1' : '0');
+  }
+  document.querySelectorAll('.checklist li').forEach(li => {
+    if (localStorage.getItem('mb-check-' + li.dataset.key) === '1') li.classList.add('done');
+  });
+</script>
+
+</body>
+</html>
