@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Day 1 Debrief — Freddie's Work Experience</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --green: #00ff88;
+      --green-dim: #00aa55;
+      --bg: #0a0f0a;
+      --surface: #0f1a0f;
+      --border: #1a3d1a;
+      --text: #c8c8c8;
+      --dim: #555;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    #binary-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 0;
+      opacity: 0.05;
+      pointer-events: none;
+    }
+
+    .scroll-bar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 2px;
+      background: var(--green);
+      z-index: 300;
+      transition: width 0.05s;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10,15,10,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-family: monospace;
+      font-size: 1rem;
+      color: var(--green);
+      letter-spacing: 2px;
+    }
+
+    header span {
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: var(--dim);
+    }
+
+    /* ── NAV ── */
+    .nav {
+      position: sticky;
+      top: 53px;
+      z-index: 99;
+      background: rgba(10,15,10,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 48px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+    }
+
+    .pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--dim);
+      font-family: monospace;
+      font-size: 0.72rem;
+      padding: 5px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      letter-spacing: 1px;
+    }
+    .pill:hover, .pill.active { border-color: var(--green); color: var(--green); }
+
+    /* ── SECTIONS ── */
+    section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 64px 48px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 1;
+    }
+
+    .label {
+      font-family: monospace;
+      font-size: 0.68rem;
+      letter-spacing: 3px;
+      color: var(--green);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    section h2 {
+      font-size: 1.9rem;
+      color: #fff;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+
+    section > p {
+      color: var(--text);
+      line-height: 1.75;
+      margin-bottom: 14px;
+      max-width: 640px;
+      font-size: 1rem;
+    }
+
+    /* ── TIMELINE ── */
+    .timeline {
+      display: flex;
+      margin: 36px 0;
+    }
+
+    .tl-item {
+      flex: 1;
+      text-align: center;
+      position: relative;
+    }
+
+    .tl-item::after {
+      content: '';
+      position: absolute;
+      top: 13px;
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+    }
+    .tl-item:last-child::after { display: none; }
+
+    .tl-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(0,255,136,0.4);
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: monospace;
+      font-size: 0.7rem;
+      font-weight: bold;
+      color: #000;
+      position: relative;
+      z-index: 1;
+    }
+
+    .tl-label { font-family: monospace; font-size: 0.65rem; color: var(--green); text-transform: uppercase; letter-spacing: 1px; }
+    .tl-time  { font-family: monospace; font-size: 0.6rem; color: var(--dim); margin-top: 3px; }
+
+    /* ── CARDS ── */
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 28px 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px 22px;
+    }
+
+    .card h3 {
+      font-family: monospace;
+      font-size: 0.8rem;
+      letter-spacing: 2px;
+      color: var(--green);
+      margin-bottom: 8px;
+    }
+
+    .card p { font-size: 0.88rem; line-height: 1.6; color: #aaa; margin: 0; }
+    .card code { color: var(--green); font-family: monospace; }
+    .span2 { grid-column: 1 / -1; }
+
+    /* ── TERMINAL ── */
+    .terminal {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 24px 0;
+    }
+
+    .term-bar {
+      background: #1a1a1a;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dr { background: #ff5f57; } .dy { background: #febc2e; } .dg { background: #28c840; }
+
+    .term-title { margin-left: 8px; font-family: monospace; font-size: 0.72rem; color: #555; }
+
+    .term-body {
+      padding: 18px 22px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.9;
+      min-height: 160px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .t-line { display: flex; gap: 8px; }
+    .t-prompt { color: var(--green); white-space: nowrap; }
+    .t-cmd { color: #fff; }
+    .t-out { color: #666; padding-left: 16px; }
+    .t-success { color: var(--green); padding-left: 16px; }
+
+    .play-btn {
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: monospace;
+      font-size: 0.78rem;
+      padding: 7px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.15s;
+      margin-bottom: 10px;
+    }
+    .play-btn:hover { background: var(--green); color: #000; }
+
+    /* ── LIVE EDITOR ── */
+    .editor-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 24px 0;
+    }
+
+    .editor-pane {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .pane-label {
+      background: #111;
+      padding: 8px 16px;
+      font-family: monospace;
+      font-size: 0.72rem;
+      color: #555;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .editor-ta {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--green);
+      font-family: monospace;
+      font-size: 0.8rem;
+      padding: 14px;
+      resize: none;
+      outline: none;
+      height: 230px;
+      line-height: 1.6;
+    }
+
+    iframe.preview {
+      width: 100%;
+      height: 262px;
+      border: none;
+      background: #fff;
+    }
+
+    /* ── GIT GRAPH ── */
+    .git-graph {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 22px 24px;
+      margin: 24px 0;
+      font-family: monospace;
+    }
+
+    .git-meta { font-size: 0.72rem; color: #444; margin-bottom: 16px; }
+
+    .git-node {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 6px 0;
+      opacity: 0;
+      transform: translateX(-12px);
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    .git-node.show { opacity: 1; transform: translateX(0); }
+    .git-node.dim { opacity: 0.25; }
+
+    .g-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(0,255,136,0.5);
+      flex-shrink: 0;
+    }
+    .g-dot.empty { background: #1a3d1a; box-shadow: none; }
+
+    .g-hash { font-size: 0.72rem; color: var(--green-dim); }
+    .g-msg  { font-size: 0.85rem; color: #fff; }
+    .g-right { margin-left: auto; font-size: 0.72rem; color: #444; }
+
+    .g-stem { width: 2px; height: 20px; background: var(--border); margin-left: 6px; }
+
+    /* ── LOCALSTORAGE DEMO ── */
+    .ls-demo {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 22px 24px;
+      margin: 20px 0;
+    }
+
+    .ls-input {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: #fff;
+      font-family: monospace;
+      font-size: 0.9rem;
+      padding: 10px 14px;
+      outline: none;
+      margin-bottom: 10px;
+      transition: border-color 0.15s;
+    }
+    .ls-input:focus { border-color: var(--green); }
+
+    .ls-status { font-family: monospace; font-size: 0.78rem; color: var(--dim); }
+    .ls-status.ok { color: var(--green); }
+
+    /* ── CODE BLOCK ── */
+    .code {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      line-height: 1.75;
+      margin: 16px 0;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .c-kw   { color: #c586c0; }
+    .c-fn   { color: var(--green); }
+    .c-str  { color: #ce9178; }
+    .c-cmt  { color: #6a9955; }
+
+    /* ── TOMORROW LIST ── */
+    .tmr-list { list-style: none; margin: 20px 0; }
+    .tmr-list li {
+      display: flex;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.95rem;
+      align-items: flex-start;
+    }
+    .tmr-list li:last-child { border-bottom: none; }
+    .tmr-time { font-family: monospace; font-size: 0.72rem; color: var(--green); min-width: 90px; padding-top: 3px; }
+
+    /* ── LIVE LINK ── */
+    .live-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--green);
+      border-radius: 6px;
+      padding: 14px 22px;
+      font-family: monospace;
+      color: var(--green);
+      font-size: 0.9rem;
+      text-decoration: none;
+      margin: 20px 0;
+      transition: background 0.15s;
+    }
+    .live-link:hover { background: rgba(0,255,136,0.08); }
+
+    .note { font-family: monospace; font-size: 0.8rem; color: var(--dim); margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<canvas id="binary-canvas"></canvas>
+<div class="scroll-bar" id="scroll-bar"></div>
+
+<header>
+  <h1>// day-1-debrief</h1>
+  <span>Wednesday 20 May 2026 · Freddie Mason · Work Experience</span>
+</header>
+
+<nav class="nav">
+  <div class="pill active" data-target="intro">Intro</div>
+  <div class="pill" data-target="terminal">Terminal</div>
+  <div class="pill" data-target="html">HTML</div>
+  <div class="pill" data-target="git">Git & GitHub</div>
+  <div class="pill" data-target="css-js">CSS & JavaScript</div>
+  <div class="pill" data-target="deploy">Deploy</div>
+  <div class="pill" data-target="tomorrow">Tomorrow</div>
+</nav>
+
+<main>
+
+  <!-- INTRO -->
+  <section id="intro">
+    <div class="label">01 · Overview</div>
+    <h2>From zero to live<br>in one morning.</h2>
+    <p>Freddie had never written a line of code before today. By 11:20am his diary site was live on the internet, auto-saving entries in the browser, with a 3D book-flip animation and a binary rain background he can send to anyone.</p>
+    <p>Here's everything that happened, how each piece of technology works, and why it matters.</p>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot">1</div>
+        <div class="tl-label">Brief</div>
+        <div class="tl-time">09:00</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">2</div>
+        <div class="tl-label">Setup</div>
+        <div class="tl-time">09:30</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">3</div>
+        <div class="tl-label">First Win</div>
+        <div class="tl-time">10:30</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">4</div>
+        <div class="tl-label">GitHub</div>
+        <div class="tl-time">11:00</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">5</div>
+        <div class="tl-label">Live 🎉</div>
+        <div class="tl-time">11:20</div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>What's live</h3>
+        <p>fmkeith.github.io/freddie-diary — a multi-page interactive diary with animations, auto-save, and a 3D book flip animation.</p>
+      </div>
+      <div class="card">
+        <h3>Technologies used</h3>
+        <p>HTML · CSS · JavaScript · Git · GitHub CLI · GitHub Pages · localStorage · Canvas API</p>
+      </div>
+      <div class="card">
+        <h3>Commands typed today</h3>
+        <p><code style="color:var(--green);font-family:monospace">mkdir · cd · git init · git add · git commit · gh repo create</code></p>
+      </div>
+      <div class="card">
+        <h3>Lines of code shipped</h3>
+        <p><span style="font-size:1.8rem;color:var(--green);font-family:monospace">355</span> — in a single commit, by someone who'd never coded before.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TERMINAL -->
+  <section id="terminal">
+    <div class="label">02 · The Terminal</div>
+    <h2>Talking directly<br>to the computer.</h2>
+    <p>The terminal is a text interface to the operating system. No clicking, no icons — just commands. It's faster, scriptable, and it's what every professional developer uses to navigate, build, and deploy.</p>
+    <p>Freddie's first commands were <code style="color:var(--green);font-family:monospace">mkdir</code> and <code style="color:var(--green);font-family:monospace">cd</code> — creating a folder and moving into it. Hit play to watch the full session replay.</p>
+
+    <button class="play-btn" id="play-btn" onclick="playTerminal()">▶ Replay Freddie's session</button>
+
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div>
+        <span class="term-title">zsh — ~/Code/freddie-diary</span>
+      </div>
+      <div class="term-body" id="term-body">
+        <div class="t-out">Click ▶ to replay the session</div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>mkdir</h3>
+        <p><strong>make directory</strong> — creates a folder. Like right-clicking → "New Folder", but instant.</p>
+      </div>
+      <div class="card">
+        <h3>cd</h3>
+        <p><strong>change directory</strong> — moves into a folder. Like double-clicking it in Finder.</p>
+      </div>
+      <div class="card">
+        <h3>ls</h3>
+        <p><strong>list</strong> — shows the contents of the current folder.</p>
+      </div>
+      <div class="card">
+        <h3>pwd</h3>
+        <p><strong>print working directory</strong> — tells you exactly where you are in the file system.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HTML -->
+  <section id="html">
+    <div class="label">03 · HTML</div>
+    <h2>The skeleton of<br>every webpage.</h2>
+    <p>HTML (HyperText Markup Language) is how you describe the structure of a web page. It isn't a programming language — it doesn't do logic. It just says: here's a heading, here's a paragraph, here's an image.</p>
+    <p>Every website you've ever visited — YouTube, Instagram, the BBC — starts with HTML. Edit the code on the left and watch the result appear on the right.</p>
+
+    <div class="editor-wrap">
+      <div class="editor-pane">
+        <div class="pane-label">✏ Edit the HTML</div>
+        <textarea class="editor-ta" id="html-ta" oninput="updatePreview()" spellcheck="false">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+  &lt;head&gt;
+    &lt;title&gt;My First Page&lt;/title&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;h1&gt;Hello World&lt;/h1&gt;
+    &lt;p&gt;This is my diary site.&lt;/p&gt;
+    &lt;p&gt;Day 1.&lt;/p&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</textarea>
+      </div>
+      <div class="editor-pane">
+        <div class="pane-label">👁 Live preview</div>
+        <iframe class="preview" id="preview"></iframe>
+      </div>
+    </div>
+
+    <p class="note">Every tag has an opening &lt;tag&gt; and a closing &lt;/tag&gt;. Content sits between them. That's the whole system.</p>
+  </section>
+
+  <!-- GIT -->
+  <section id="git">
+    <div class="label">04 · Git & GitHub</div>
+    <h2>Never lose your<br>work again.</h2>
+    <p>Git takes snapshots of your code called <strong>commits</strong>. Each commit records what changed, who changed it, and when. If something breaks, you can roll back to any previous snapshot.</p>
+    <p>GitHub is where those snapshots live online. It's a backup, a portfolio, and a collaboration tool — all at once. Today Freddie created his first repo.</p>
+
+    <div class="git-graph">
+      <div class="git-meta">fmkeith / freddie-diary · branch: main</div>
+
+      <div class="git-node" id="gn-a">
+        <div class="g-dot"></div>
+        <div>
+          <div class="g-msg">Add work experience diary day 1</div>
+          <div class="g-hash">d4205d8 · Freddie Mason · Wed 20 May 2026</div>
+        </div>
+        <div class="g-right">355 lines</div>
+      </div>
+      <div class="g-stem"></div>
+      <div class="git-node dim" id="gn-b">
+        <div class="g-dot empty"></div>
+        <div><div class="g-msg" style="color:#444">Thursday's commits will appear here...</div></div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>git init</h3>
+        <p>Starts Git tracking in a folder. Run once per project. Creates a hidden <code>.git</code> folder that stores the history.</p>
+      </div>
+      <div class="card">
+        <h3>git add</h3>
+        <p>Stages files — tells Git "include these changes in my next snapshot." You choose what goes in each commit.</p>
+      </div>
+      <div class="card">
+        <h3>git commit</h3>
+        <p>Takes the snapshot with a message. Commit messages are how you (and teammates) understand what changed and why.</p>
+      </div>
+      <div class="card">
+        <h3>gh repo create</h3>
+        <p>GitHub CLI command that creates a remote repo and pushes your code to it in one step. No browser needed.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CSS & JS -->
+  <section id="css-js">
+    <div class="label">05 · CSS & JavaScript</div>
+    <h2>Making it look good.<br>Making it do things.</h2>
+    <p>HTML is the skeleton. <strong>CSS</strong> is the skin — colours, fonts, spacing, animation. <strong>JavaScript</strong> is the brain — logic, events, interactivity.</p>
+    <p>Today's diary used three interesting techniques:</p>
+
+    <div class="cards">
+      <div class="card span2">
+        <h3>Canvas API — the binary rain</h3>
+        <p>The falling 1s and 0s are drawn using the HTML Canvas API — a JavaScript tool for drawing graphics pixel by pixel. A <code>setInterval</code> calls the draw function 25 times per second, giving the illusion of movement. Each column of characters has its own drop position tracked in an array.</p>
+      </div>
+      <div class="card">
+        <h3>CSS 3D Transforms — the book flip</h3>
+        <p>The page flip is pure CSS. Setting <code>perspective</code> on a parent and <code>rotateY(-180deg)</code> on a child creates a genuine 3D rotation. <code>backface-visibility: hidden</code> hides the back face so you see the next page behind it instead.</p>
+      </div>
+      <div class="card">
+        <h3>Auto-capitalise after a full stop</h3>
+        <p>A <code>keydown</code> event listener fires on every keypress. It checks if the text before the cursor ends with <code>". "</code> — and if so, intercepts the letter and replaces it with its uppercase version before inserting it.</p>
+      </div>
+    </div>
+
+    <h3 style="color:#fff;margin:36px 0 10px;font-size:1.1rem">localStorage — how the diary auto-saves</h3>
+    <p>The browser has a built-in key-value store called <code style="color:var(--green);font-family:monospace">localStorage</code>. It persists across page refreshes and browser restarts — no server needed. Type something below, then refresh this page.</p>
+
+    <div class="ls-demo">
+      <input class="ls-input" id="ls-in" placeholder="Type something, then refresh the page..." oninput="lsSave()" />
+      <div class="ls-status" id="ls-st">start typing...</div>
+    </div>
+
+    <div class="code"><span class="c-cmt">// Save — runs on every keystroke</span>
+<span class="c-fn">localStorage</span>.setItem(<span class="c-str">'diary-page1'</span>, textarea.value);
+
+<span class="c-cmt">// Load — runs when the page opens</span>
+textarea.value = <span class="c-fn">localStorage</span>.getItem(<span class="c-str">'diary-page1'</span>) || <span class="c-str">''</span>;</div>
+  </section>
+
+  <!-- DEPLOY -->
+  <section id="deploy">
+    <div class="label">06 · Deployment</div>
+    <h2>Getting it on<br>the internet.</h2>
+    <p>A site that only runs on your laptop isn't a website — it's a file. Deployment means copying your code to a server that's connected to the internet 24/7, so anyone with the URL can see it.</p>
+    <p>Today we used <strong>GitHub Pages</strong> — a free service that turns any GitHub repo into a live website. Two commands. Done.</p>
+
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div>
+        <span class="term-title">deploying to GitHub Pages</span>
+      </div>
+      <div class="term-body">
+        <div class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">gh repo create freddie-diary --public --source=. --remote=origin --push</span></div>
+        <div class="t-out">https://github.com/fmkeith/freddie-diary</div>
+        <div class="t-out">* [new branch]  HEAD → main</div>
+        <div style="height:6px"></div>
+        <div class="t-line"><span class="t-prompt">$ </span><span class="t-cmd">gh api repos/fmkeith/freddie-diary/pages --method POST ...</span></div>
+        <div class="t-success">✓ Pages enabled → https://fmkeith.github.io/freddie-diary/</div>
+      </div>
+    </div>
+
+    <a class="live-link" href="https://fmkeith.github.io/freddie-diary/" target="_blank">
+      🌐 fmkeith.github.io/freddie-diary
+    </a>
+
+    <div class="cards">
+      <div class="card">
+        <h3>GitHub CLI (gh)</h3>
+        <p>Instead of clicking around github.com, <code>gh</code> lets you create repos, manage pull requests, and enable Pages from the terminal. Faster and scriptable.</p>
+      </div>
+      <div class="card">
+        <h3>What "live" actually means</h3>
+        <p>GitHub's servers now serve Freddie's <code>index.html</code> to anyone in the world who visits that URL. His laptop can be off. It still works.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOMORROW -->
+  <section id="tomorrow">
+    <div class="label">07 · Tomorrow</div>
+    <h2>Thursday — from laptop<br>to real infrastructure.</h2>
+    <p>Today's site runs on GitHub's servers. Thursday we move it to Stu's Hetzner VPS using Coolify, connect the custom domain purchased today, and get HTTPS with auto-deploy on every git push.</p>
+
+    <ul class="tmr-list">
+      <li><span class="tmr-time">09:00–09:30</span>Write diary entry 2 — reflect on today</li>
+      <li><span class="tmr-time">09:30–10:30</span>Choose tech stack for the final diary site</li>
+      <li><span class="tmr-time">10:30–11:30</span>Set up Coolify project, connect GitHub repo</li>
+      <li><span class="tmr-time">11:30–12:30</span>Add A record in Cloudflare — site goes live with SSL</li>
+      <li><span class="tmr-time">12:30–13:30</span>Lunch</li>
+      <li><span class="tmr-time">13:30–14:30</span>Add homepage, diary entries, test auto-deploy</li>
+      <li><span class="tmr-time">14:30–15:00</span>Diary entry 2 committed and live on the real domain</li>
+    </ul>
+
+    <p class="note">End state: fmkeith.github.io is replaced by a real domain (e.g. freddiemason.dev) running on Hetzner, with automatic deploys every time a commit is pushed.</p>
+  </section>
+
+</main>
+
+<script>
+  // Binary rain
+  const canvas = document.getElementById('binary-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const cols = Math.floor(canvas.width / 14);
+  const drops = Array(cols).fill(1);
+  setInterval(() => {
+    ctx.fillStyle = 'rgba(10,15,10,0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '14px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      ctx.fillText(Math.random() > 0.5 ? '1' : '0', i * 14, drops[i] * 14);
+      if (drops[i] * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }, 40);
+  window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+  // Scroll bar
+  window.addEventListener('scroll', () => {
+    const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+    document.getElementById('scroll-bar').style.width = pct + '%';
+    updateActivePill();
+  });
+
+  // Nav pills
+  document.querySelectorAll('.pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.getElementById(pill.dataset.target)?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  function updateActivePill() {
+    const sections = document.querySelectorAll('section');
+    let current = '';
+    sections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) current = s.id; });
+    document.querySelectorAll('.pill').forEach(p => {
+      p.classList.toggle('active', p.dataset.target === current);
+    });
+  }
+
+  // Terminal replay
+  const session = [
+    { type: 'cmd', prompt: '~ $', cmd: 'mkdir freddie-diary', delay: 0 },
+    { type: 'cmd', prompt: '~ $', cmd: 'cd freddie-diary', delay: 900 },
+    { type: 'cmd', prompt: '~/freddie-diary $', cmd: 'git init', delay: 1700 },
+    { type: 'out', text: 'Initialized empty Git repository in freddie-diary/.git/', delay: 2100 },
+    { type: 'cmd', prompt: '~/freddie-diary $', cmd: 'git add index.html', delay: 2900 },
+    { type: 'cmd', prompt: '~/freddie-diary $', cmd: 'git commit -m "Add work experience diary day 1"', delay: 3700 },
+    { type: 'out', text: '[main (root-commit) d4205d8] Add work experience diary day 1', delay: 4300 },
+    { type: 'out', text: ' 1 file changed, 355 insertions(+)', delay: 4500 },
+    { type: 'cmd', prompt: '~/freddie-diary $', cmd: 'gh repo create freddie-diary --public --source=. --push', delay: 5200 },
+    { type: 'ok',  text: '✓ https://github.com/fmkeith/freddie-diary', delay: 6100 },
+    { type: 'ok',  text: '✓ Pages live → fmkeith.github.io/freddie-diary/', delay: 6500 },
+  ];
+
+  let termPlaying = false;
+  function playTerminal() {
+    if (termPlaying) return;
+    termPlaying = true;
+    const body = document.getElementById('term-body');
+    body.innerHTML = '';
+    session.forEach(({ type, prompt, cmd, text, delay }) => {
+      setTimeout(() => {
+        const d = document.createElement('div');
+        if (type === 'cmd') d.innerHTML = `<div class="t-line"><span class="t-prompt">${prompt}</span><span class="t-cmd"> ${cmd}</span></div>`;
+        else if (type === 'ok')  d.innerHTML = `<div class="t-success">${text}</div>`;
+        else d.innerHTML = `<div class="t-out">${text}</div>`;
+        body.appendChild(d);
+        body.scrollTop = body.scrollHeight;
+        if (delay === session[session.length - 1].delay) {
+          setTimeout(() => { termPlaying = false; document.getElementById('play-btn').textContent = '↺ Replay'; }, 500);
+        }
+      }, delay);
+    });
+  }
+
+  // Live HTML editor
+  function updatePreview() {
+    document.getElementById('preview').srcdoc = document.getElementById('html-ta').value;
+  }
+  updatePreview();
+
+  // Git graph animate on scroll
+  const gitObs = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) {
+      setTimeout(() => document.getElementById('gn-a').classList.add('show'), 150);
+      setTimeout(() => document.getElementById('gn-b').classList.add('show'), 500);
+    }
+  }, { threshold: 0.3 });
+  gitObs.observe(document.getElementById('gn-a'));
+
+  // localStorage demo
+  const lsKey = 'debrief-ls-demo';
+  const lsIn = document.getElementById('ls-in');
+  const lsSt = document.getElementById('ls-st');
+  const saved = localStorage.getItem(lsKey);
+  if (saved) {
+    lsIn.value = saved;
+    lsSt.textContent = '✓ Loaded from localStorage — survived the page load.';
+    lsSt.className = 'ls-status ok';
+  }
+  function lsSave() {
+    localStorage.setItem(lsKey, lsIn.value);
+    lsSt.textContent = '✓ Saved — refresh the page and it\'ll still be here.';
+    lsSt.className = 'ls-status ok';
+  }
+</script>
+
+</body>
+</html>
