@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freddie's Diary</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      body {
+        background: #0d0d0d;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Georgia, serif;
+        overflow: hidden;
+      }
+
+      canvas {
+        position: fixed;
+        top: 0; left: 0;
+        z-index: 0;
+        opacity: 0.18;
+      }
+
+      .book-scene {
+        perspective: 1800px;
+        z-index: 1;
+        position: relative;
+      }
+
+      .book {
+        position: relative;
+        width: 520px;
+        height: 640px;
+        transform-style: preserve-3d;
+        filter: drop-shadow(0 30px 60px rgba(0,0,0,0.8));
+      }
+
+      .book::after {
+        content: '';
+        position: absolute;
+        bottom: -30px;
+        left: 5%;
+        width: 90%;
+        height: 30px;
+        background: rgba(0,255,136,0.06);
+        filter: blur(20px);
+        border-radius: 50%;
+      }
+
+      /* ── shared page styles ── */
+      .page {
+        position: absolute;
+        inset: 0;
+        transform-origin: left center;
+        transform-style: preserve-3d;
+        transition: transform 1.5s cubic-bezier(0.77, 0, 0.175, 1);
+        cursor: pointer;
+      }
+
+      .page.flipped {
+        transform: rotateY(-180deg);
+      }
+
+      .page-front,
+      .page-back,
+      .cover-front,
+      .cover-back {
+        position: absolute;
+        inset: 0;
+        backface-visibility: hidden;
+        border-radius: 0 6px 6px 0;
+      }
+
+      .page-back {
+        transform: rotateY(180deg);
+        background: #091509;
+        border-right: 1px solid #1a3d1a;
+      }
+
+      /* ── shared inner page skin ── */
+      .page-skin {
+        width: 100%;
+        height: 100%;
+        background: #080e08;
+        border: 1px solid #1a3d1a;
+        border-left: 5px solid #00ff88;
+        border-radius: 0 6px 6px 0;
+        overflow-y: auto;
+        padding: 44px 48px;
+      }
+
+      .entry-date {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        color: #00ff88;
+        margin-bottom: 10px;
+        font-family: monospace;
+      }
+
+      .entry-title {
+        font-size: 1.5rem;
+        color: #e8e8e8;
+        margin-bottom: 28px;
+      }
+
+      textarea {
+        width: 100%;
+        border: none;
+        border-bottom: 2px dashed #162e1e;
+        background: transparent;
+        font-family: Georgia, serif;
+        font-size: 0.95rem;
+        color: #c8c8c8;
+        line-height: 1.9;
+        resize: none;
+        outline: none;
+        padding: 8px 0;
+        height: 380px;
+        cursor: text;
+      }
+
+      textarea::placeholder {
+        color: #243d2c;
+        font-style: italic;
+      }
+
+      .tag {
+        display: inline-block;
+        color: #00ff88;
+        font-size: 0.7rem;
+        padding: 3px 10px;
+        border-radius: 20px;
+        margin-top: 18px;
+        font-family: monospace;
+        letter-spacing: 1px;
+        border: 1px solid #1a3d2a;
+      }
+
+      /* ── COVER ── */
+      #cover {
+        z-index: 3;
+      }
+
+      .cover-front {
+        background: linear-gradient(160deg, #0b200b 0%, #0f300f 50%, #091509 100%);
+        border-left: 10px solid #061006;
+        border-right: 1px solid #1a3d1a;
+        border-top: 1px solid #1a3d1a;
+        border-bottom: 1px solid #1a3d1a;
+        box-shadow: inset -6px 0 20px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 48px;
+      }
+
+      .cover-back {
+        transform: rotateY(180deg);
+        background: #091509;
+        border-right: 1px solid #1a3d1a;
+      }
+
+      .cover-emblem {
+        font-size: 3.5rem;
+        color: #1a6a3a;
+        text-shadow: 0 0 30px rgba(0,255,136,0.2);
+        margin-bottom: 8px;
+      }
+
+      .cover-title {
+        color: #00ff88;
+        font-size: 2.2rem;
+        letter-spacing: 5px;
+        text-align: center;
+        text-shadow: 0 0 30px rgba(0,255,136,0.4);
+        line-height: 1.3;
+      }
+
+      .cover-sub {
+        color: #2a6a40;
+        font-size: 0.72rem;
+        font-family: monospace;
+        letter-spacing: 3px;
+        text-align: center;
+      }
+
+      .cover-name {
+        color: #e8e8e8;
+        font-size: 1rem;
+        font-family: Georgia, serif;
+        letter-spacing: 3px;
+        text-align: center;
+        font-style: italic;
+      }
+
+      .cover-rule {
+        width: 60%;
+        height: 1px;
+        background: linear-gradient(to right, transparent, #1a5a2a, transparent);
+      }
+
+      .cover-hint {
+        color: #1a4a2a;
+        font-size: 0.68rem;
+        font-family: monospace;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-top: 12px;
+        animation: pulse 2.4s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.5); }
+      }
+
+      #cover { z-index: 3; }
+      #page1 { z-index: 2; }
+      #page2 { z-index: 1; }
+    </style>
+  </head>
+  <body>
+
+    <canvas id="matrix"></canvas>
+
+    <div class="book-scene">
+      <div class="book">
+
+        <!-- Page 2 — Wednesday -->
+        <div class="page" id="page2">
+          <div class="page-front">
+            <div class="page-skin">
+              <div class="entry-date">Wednesday, 20 May 2026 — Day 2</div>
+              <div class="entry-title">Foundations &amp; First Win</div>
+              <textarea placeholder="Write about your Wednesday here..."></textarea>
+              <div><span class="tag">week1 · html · setup · first-commit</span></div>
+            </div>
+          </div>
+          <div class="page-back"></div>
+        </div>
+
+        <!-- Page 1 — Tuesday (sits above page 2) -->
+        <div class="page" id="page1">
+          <div class="page-front">
+            <div class="page-skin">
+              <div class="entry-date">Tuesday, 19 May 2026 — Pre-flight</div>
+              <div class="entry-title">Getting Ready</div>
+              <textarea placeholder="Write about your Tuesday here..."></textarea>
+              <div><span class="tag">week1 · pre-flight · setup</span></div>
+            </div>
+          </div>
+          <div class="page-back"></div>
+        </div>
+
+        <!-- Cover (top of stack) -->
+        <div class="page" id="cover">
+          <div class="cover-front">
+            <div class="cover-emblem">⌨</div>
+            <div class="cover-title">Work Experience<br>Diary</div>
+            <div class="cover-rule"></div>
+            <div class="cover-name">Freddie Mason</div>
+            <div class="cover-sub">// year-10 &nbsp;·&nbsp; 2026</div>
+            <div class="cover-hint">— click to open —</div>
+          </div>
+          <div class="cover-back"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <script>
+      // Matrix background
+      const canvas = document.getElementById('matrix');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const chars = 'アイウエオカキクケコ0123456789ABCDEF</>{}[];'.split('');
+      const fontSize = 14;
+      const cols = Math.floor(canvas.width / fontSize);
+      const drops = Array(cols).fill(1);
+      function drawMatrix() {
+        ctx.fillStyle = 'rgba(13,13,13,0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ff88';
+        ctx.font = fontSize + 'px monospace';
+        for (let i = 0; i < drops.length; i++) {
+          ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * fontSize, drops[i] * fontSize);
+          if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+          drops[i]++;
+        }
+      }
+      setInterval(drawMatrix, 40);
+
+      // Auto-save textareas to localStorage
+      document.querySelectorAll('textarea').forEach((ta) => {
+        const key = 'diary-' + ta.closest('.page').id;
+        ta.value = localStorage.getItem(key) || '';
+        ta.addEventListener('input', () => localStorage.setItem(key, ta.value));
+      });
+      window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      });
+
+      // Book flip logic
+      const ANIM = 1500;
+      let state = 0; // 0=closed, 1=tuesday, 2=wednesday
+      let busy = false;
+
+      const cover = document.getElementById('cover');
+      const page1 = document.getElementById('page1');
+      const page2 = document.getElementById('page2');
+
+      // z-index per state: [cover, page1, page2]
+      const Z = [
+        [3, 2, 1],  // 0: closed
+        [1, 3, 1],  // 1: tuesday visible
+        [1, 2, 3],  // 2: wednesday visible
+      ];
+
+      function applyZ() {
+        [cover, page1, page2].forEach((el, i) => {
+          el.style.zIndex = Z[state][i];
+        });
+      }
+
+      function flip(el, open) {
+        busy = true;
+        el.style.zIndex = 10;
+        open ? el.classList.add('flipped') : el.classList.remove('flipped');
+        setTimeout(() => { applyZ(); busy = false; }, ANIM);
+      }
+
+      cover.addEventListener('click', (e) => {
+        if (e.target.tagName === 'TEXTAREA' || busy) return;
+        if (state === 0) { state = 1; flip(cover, true); }
+        else if (state === 1) { state = 0; flip(cover, false); }
+      });
+
+      page1.addEventListener('click', (e) => {
+        if (e.target.tagName === 'TEXTAREA' || busy) return;
+        if (state === 1) { state = 2; flip(page1, true); }
+        else if (state === 2) { state = 1; flip(page1, false); }
+      });
+
+    </script>
+
+  </body>
+</html>
